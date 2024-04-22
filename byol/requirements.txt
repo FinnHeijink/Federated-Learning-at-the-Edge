@@ -7,3 +7,5 @@ numpy>=1.16
 optax
 tensorflow
 tensorflow_datasets
+
+setuptools==65.5.1
