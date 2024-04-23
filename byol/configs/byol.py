@@ -37,10 +37,10 @@ def get_config(num_epochs: int, batch_size: int):
       enable_double_transpose=True,
       base_target_ema=_EMA_PRESETS[num_epochs],
       network_config=dict(
-          projector_hidden_size=4096,
-          projector_output_size=256,
-          predictor_hidden_size=4096,
-          encoder_class='ResNet50',  # Should match a class in utils/networks.
+          projector_hidden_size=32,
+          projector_output_size=10,
+          predictor_hidden_size=32,
+          encoder_class='TinyResNet',  # Should match a class in utils/networks.
           encoder_config=dict(
               resnet_v2=False,
               width_multiplier=1),

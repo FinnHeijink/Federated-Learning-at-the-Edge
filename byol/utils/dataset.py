@@ -46,10 +46,10 @@ class Split(enum.Enum):
   @property
   def num_examples(self):
     return {
-        Split.TRAIN_AND_VALID: 1281167,
-        Split.TRAIN: 1271167,
-        Split.VALID: 10000,
-        Split.TEST: 50000
+        Split.TRAIN_AND_VALID: 60000,
+        Split.TRAIN: 55000,
+        Split.VALID: 5000,
+        Split.TEST: 10000
     }[self]
 
 
@@ -83,9 +83,10 @@ def load(split: Split,
   tfds_split = tfds.core.ReadInstruction(
       _to_tfds_split(split), from_=start, to=end, unit='abs')
   ds = tfds.load(
-      'imagenet2012:5.*.*',
-      split=tfds_split,
-      decoders={'image': tfds.decode.SkipDecoding()})
+      'mnist',
+      split=tfds_split
+    #,decoders={'image': tfds.decode.SkipDecoding()}
+      )
 
   options = tf.data.Options()
   options.experimental_threading.private_threadpool_size = 48
@@ -186,6 +187,7 @@ def _preprocess_image(
     mode: PreprocessMode,
 ) -> tf.Tensor:
   """Returns processed and resized images."""
+
   if mode is PreprocessMode.PRETRAIN:
     image = _decode_and_random_crop(image_bytes)
     # Random horizontal flipping is optionally done in augmentations.preprocess.
@@ -197,17 +199,27 @@ def _preprocess_image(
   # NOTE: Bicubic resize (1) casts uint8 to float32 and (2) resizes without
   # clamping overshoots. This means values returned will be outside the range
   # [0.0, 255.0] (e.g. we have observed outputs in the range [-51.1, 336.6]).
-  assert image.dtype == tf.uint8
-  image = tf.image.resize(image, [224, 224], tf.image.ResizeMethod.BICUBIC)
+
+  #assert image.dtype == tf.uint8
+  #image = tf.image.resize(image, [224, 224], tf.image.ResizeMethod.BICUBIC)
   image = tf.clip_by_value(image / 255., 0., 1.)
+  image = tf.image.grayscale_to_rgb(image)
+
   return image
 
 
 def _decode_and_random_crop(image_bytes: tf.Tensor) -> tf.Tensor:
   """Make a random crop of 224."""
-  img_size = tf.image.extract_jpeg_shape(image_bytes)
+  #img_size = tf.image.extract_jpeg_shape(image_bytes)
+  img_size = image_bytes.shape
+  img_w = img_size[1]
+  img_h = img_size[0]
+
   area = tf.cast(img_size[1] * img_size[0], tf.float32)
   target_area = tf.random.uniform([], 0.08, 1.0, dtype=tf.float32) * area
+
+  #print(area.eval())
+  #print(target_area.eval())
 
   log_ratio = (tf.math.log(3 / 4), tf.math.log(4 / 3))
   aspect_ratio = tf.math.exp(
@@ -215,6 +227,8 @@ def _decode_and_random_crop(image_bytes: tf.Tensor) -> tf.Tensor:
 
   w = tf.cast(tf.round(tf.sqrt(target_area * aspect_ratio)), tf.int32)
   h = tf.cast(tf.round(tf.sqrt(target_area / aspect_ratio)), tf.int32)
+
+  #print(w.eval(), h.eval())
 
   w = tf.minimum(w, img_size[1])
   h = tf.minimum(h, img_size[0])
@@ -228,8 +242,12 @@ def _decode_and_random_crop(image_bytes: tf.Tensor) -> tf.Tensor:
                                maxval=img_size[0] - h + 1,
                                dtype=tf.int32)
 
+  #print(offset_w.eval(), offset_h.eval())
+
   crop_window = tf.stack([offset_h, offset_w, h, w])
-  image = tf.io.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+  #image = tf.io.decode_and_crop_jpeg(image_bytes, cropDen_window, channels=3)
+  image = tf.image.crop_and_resize([image_bytes], tf.cast([[offset_h/img_h, offset_w/img_w, (offset_h + h) / img_h, (offset_w + w)/img_w]], dtype=tf.float32), tf.constant([0]), [img_h, img_w])
+  image = tf.squeeze(image, [0])  # Remove the [1] batch size dimension in front
   return image
 
 
