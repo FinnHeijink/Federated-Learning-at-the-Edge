@@ -31,7 +31,7 @@ def get_config(num_epochs: int, batch_size: int):
 
   config = dict(
       random_seed=0,
-      num_classes=1000,
+      num_classes=10,
       batch_size=batch_size,
       max_steps=num_epochs * train_images_per_epoch // batch_size,
       enable_double_transpose=True,
