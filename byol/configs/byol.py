@@ -60,7 +60,7 @@ def get_config(num_epochs: int, batch_size: int):
           momentum=.9,
       ),
       lr_schedule_config=dict(
-          base_learning_rate=_LR_PRESETS[num_epochs],
+          base_learning_rate=2,
           warmup_steps=10 * train_images_per_epoch // batch_size,
       ),
       evaluation_config=dict(
