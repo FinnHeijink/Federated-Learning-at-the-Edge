@@ -25,7 +25,8 @@ def GetConfig():
                 hiddenSize=32
             ),
             encoder=dict(
-
+                imageDims=(28, 28),
+                imageChannels=1
             )
         ),
         optimizer=dict(
