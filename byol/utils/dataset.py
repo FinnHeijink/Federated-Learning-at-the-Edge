@@ -165,7 +165,7 @@ def _to_tfds_split(split: Split) -> tfds.Split:
     return tfds.Split.TRAIN
   else:
     assert split == Split.TEST
-    return tfds.Split.VALIDATION
+    return tfds.Split.TEST
 
 
 def _shard(split: Split, shard_index: int, num_shards: int) -> Tuple[int, int]:
@@ -267,8 +267,7 @@ def _decode_and_center_crop(
     jpeg_shape: Optional[tf.Tensor] = None,
 ) -> tf.Tensor:
   """Crops to center of image with padding then scales."""
-  if jpeg_shape is None:
-    jpeg_shape = tf.image.extract_jpeg_shape(image_bytes)
+  jpeg_shape = image_bytes.shape
   image_height = jpeg_shape[0]
   image_width = jpeg_shape[1]
 
@@ -282,5 +281,9 @@ def _decode_and_center_crop(
       offset_height, offset_width, padded_center_crop_size,
       padded_center_crop_size
   ])
-  image = tf.image.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+  #image = tf.image.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+  image = tf.image.crop_and_resize([image_bytes], tf.cast(
+    [[offset_height / image_height, offset_width / image_width, (offset_height + padded_center_crop_size) / image_height, (offset_width + padded_center_crop_size) / image_width]], dtype=tf.float32),
+                                   tf.constant([0]), [image_height, image_width])
+  image = tf.squeeze(image, [0])  # Remove the [1] batch size dimension in front
   return image
