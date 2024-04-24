@@ -1,4 +1,7 @@
+import os.path as path
 from enum import Enum
+
+import torch
 
 class CheckpointMode(Enum):
     DISABLED = -1,
@@ -16,6 +19,12 @@ class Checkpointer:
         self.checkPointEveryNSecs = checkPointEveryNSecs
         self.checkPointEveryNBatches = checkPointEveryNBatches
 
+    def getModelCheckpointPath(self):
+        return path.join(self.directory, "Model.pt")
+
+    def getOptimizerCheckpointPath(self):
+        return path.join(self.directory, "Optimizer.pt")
+
     def update(self, model, optimizer, currentEpoch, maxEpochs, currentBatch, maxBatches):
         pass
 
@@ -23,4 +32,7 @@ class Checkpointer:
         pass
 
     def saveCheckpoint(self, model, optimizer):
-        pass
+        torch.save(model.state_dict(), self.getModelCheckpointPath())
+
+        if self.saveOptimizerData:
+            torch.save(optimizer.state_dict(), self.getOptimizerCheckpointPath())

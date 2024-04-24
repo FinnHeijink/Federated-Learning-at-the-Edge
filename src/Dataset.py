@@ -23,7 +23,7 @@ class Dataset:
         return self.testLoader
 
     def trainBatchCount(self):
-        return len(self.trainLoader.datasets)
+        return len(self.trainLoader.dataset)
 
     def testBatchCount(self):
-        return len(self.testLoader.datasets)
+        return len(self.testLoader.dataset)

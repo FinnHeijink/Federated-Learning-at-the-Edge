@@ -5,17 +5,17 @@ import Checkpointer
 import Model
 import Config
 import Dataset
-import ImageAugmentation
+import ImageAugmenter
 
-def TrainEpoch(model, device, dataset, optimizer, checkpointer, epoch, maxEpochs):
+def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch, maxEpochs):
     model.train()  # Enables dropout
 
     print(f"Epoch {epoch + 1}: lr={optimizer.param_groups[0]['lr']}")
 
     maxBatches = dataset.trainBatchCount()
 
-    for batchIndex, (data, target) in enumerate(Dataset.trainingEnumeration()):
-        data = ImageAugmentation.CreateImagePairBatch(data)
+    for batchIndex, (data, target) in enumerate(dataset.trainingEnumeration()):
+        data = augmenter.createImagePairBatch(data)
         data, target = data.to(device), target.to(device)
 
         optimizer.zero_grad()
@@ -39,21 +39,22 @@ def main():
     config = Config.GetConfig()
 
     torch.manual_seed(0)
-    device = torch.device(config.device)
+    device = torch.device(config["device"])
 
-    dataset = Dataset.Dataset('MNIST', **config.dataset)
-    model = Model.BYOL(**config.model).to(device)
-    checkpointer = Checkpointer.Checkpointer(**config.checkpointer)
+    dataset = Dataset.Dataset(**config["dataset"])
+    model = Model.BYOL(**config["model"]).to(device)
+    checkpointer = Checkpointer.Checkpointer(**config["checkpointer"])
 
     # Todo: scheduler
 
     if mode == "pretrain":
-        optimizer = getattr(optim, config.optimizer.name)(model.trainableParameters(), **config.optimizer.settings)
+        optimizer = getattr(optim, config["optimizer"]["name"])(model.trainableParameters(), **config["optimizer"]["settings"])
         checkpointer.loadLastCheckpoint(model, optimizer)
+        augmenter = ImageAugmenter.ImageAugmenter(imageDims=config["imageDims"])
 
-        for epoch in range(0, config.training.epochs):
-            TrainEpoch(model, device, dataset, optimizer, checkpointer, epoch, config.training.epochs)
-            if config.training.evaluateEveryEpoch:
+        for epoch in range(0, config["training"]["epochs"]):
+            TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch, config["training"]["epochs"])
+            if config["training"]["evaluateEveryEpoch"]:
                 TestEpoch(model, device, dataset)
 
     elif mode == "eval":

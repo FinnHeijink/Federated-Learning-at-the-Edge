@@ -3,6 +3,7 @@ import Checkpointer
 def GetConfig():
     return dict(
         device="cpu",
+        imageDims=(28, 28),
 
         training=dict(
             epochs=40,

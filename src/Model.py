@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss
+from itertools import chain
 
 class MLP(nn.Module):
     def __init__(self, inputSize, hiddenSize, outputSize):
@@ -71,12 +72,14 @@ class BYOL(nn.Module):
 
         image1OnlineEncoded = self.onlineEncoder(image1)
         image1Online = self.predictor(self.onlineProjector(image1OnlineEncoded))
-        image1Target = self.targetProjector(self.targetEncoder(image1))
+        with torch.no_grad():
+            image1Target = self.targetProjector(self.targetEncoder(image1))
         image1Classified = self.classifier(image1OnlineEncoded)
 
         image2OnlineEncoded = self.onlineEncoder(image2)
         image2Online = self.predictor(self.onlineProjector(image2OnlineEncoded))
-        image2Target = self.targetProjector(self.targetEncoder(image2))
+        with torch.no_grad():
+            image2Target = self.targetProjector(self.targetEncoder(image2))
         image2Classified = self.classifier(image2OnlineEncoded)
 
         classificationLoss = (nll_loss(image1Classified, target) + nll_loss(image2Classified, target)) / 2
@@ -89,4 +92,9 @@ class BYOL(nn.Module):
         return loss
 
     def trainableParameters(self):
-        raise NotImplementedError #Should only return the parameters of the online part of the network
+        return chain(
+            self.onlineEncoder.parameters(),
+            self.onlineProjector.parameters(),
+            self.predictor.parameters(),
+            self.classifier.parameters()
+        )
