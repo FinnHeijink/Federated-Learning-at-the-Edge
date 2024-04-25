@@ -1,5 +1,6 @@
 import os.path as path
 from enum import Enum
+import time
 
 import torch
 
@@ -30,7 +31,27 @@ class Checkpointer:
         return path.join(self.directory, "Optimizer.pt")
 
     def update(self, model, optimizer, currentEpoch, maxEpochs, currentBatch, maxBatches):
-        pass
+        currentTime = time.time()
+
+        if self.mode == CheckpointMode.EVERY_EPOCH:
+            if currentEpoch != self.lastEpoch:
+                self.lastEpoch = currentEpoch
+                self.saveCheckpoint(model, optimizer)
+        elif self.mode == CheckpointMode.EVERY_BATCH:
+            if currentEpoch != self.lastEpoch or currentBatch != self.lastBatch:
+                self.lastEpoch = currentEpoch
+                self.lastBatch = currentBatch
+                self.saveCheckpoint(model, optimizer)
+        elif self.mode == CheckpointMode.EVERY_N_SECS:
+            if currentTime > self.lastCheckpointTime + self.checkPointEveryNSecs:
+                self.lastCheckpointTime = currentTime
+                self.saveCheckpoint(model, optimizer)
+        elif self.mode == CheckpointMode.EVERY_N_BATCHES:
+            raise NotImplementedError
+        elif self.mode == CheckpointMode.DISABLED:
+            pass
+        else:
+            raise NotImplementedError
 
     def loadLastCheckpoint(self, model, optimizer):
         pass
