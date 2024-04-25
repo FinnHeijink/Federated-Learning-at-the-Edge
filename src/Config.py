@@ -2,7 +2,7 @@ import Checkpointer
 
 def GetConfig():
     return dict(
-        device="cpu",
+        device="cuda",
         imageDims=(28, 28),
 
         training=dict(
@@ -14,7 +14,7 @@ def GetConfig():
             batchSize=64
         ),
         EMA=dict(
-            initialTau=0.95
+            initialTau=0.98
         ),
         model=dict(
             classCount=10,

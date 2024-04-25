@@ -69,7 +69,9 @@ class EMA:
 
     def apply(self, online, target):
         for onlineParam, targetParam in zip(online, target):
-            targetParam = targetParam * self.tau + onlineParam * (1 - self.tau)
+            targetParam.data = targetParam.data * self.tau + onlineParam.data * (1.0 - self.tau)
+            targetParam.requires_grad = False
+            targetParam.grad = None
 
 class BYOL(nn.Module):
     def __init__(self, ema, classCount, predictor, projector, classifier, encoder):
@@ -83,6 +85,12 @@ class BYOL(nn.Module):
         self.targetProjector = Projector(inputSize=self.targetEncoder.getOutputSize(), **projector)
         self.predictor = Predictor(inputSize=self.onlineProjector.getOutputSize(), outputSize=self.targetProjector.getOutputSize(), **predictor)
         self.classifier = Classifier(inputSize=self.onlineEncoder.getOutputSize(), outputSize=classCount, **classifier)
+
+        # Make sure the target network starts out the same as the online network
+        for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
+            targetParam.data = onlineParam.data
+            targetParam.requires_grad = False
+            targetParam.grad = None
 
     def predictEval(self, x, target):
         output = self.classifier(self.onlineEncoder(x))

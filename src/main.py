@@ -22,14 +22,14 @@ def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch
         loss, classificationLoss, onlineLoss = model(dataView1, dataView2, target)
         loss.backward()
         optimizer.step()
-        #model.stepEMA()
+        model.stepEMA()
 
         checkpointer.update(model, optimizer, epoch, maxEpochs, batchIndex, maxBatches)
 
         #Todo: let the checkpointer or so show this, or at least allow for configuration
         if batchIndex % 10 == 0:
             print(
-                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxBatches * 100:.1f}%: loss={loss:.2f}, classificationLoss={classificationLoss.item():.2f}, onlineLoss={onlineLoss.item():.2f}")
+                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxBatches * 100:.1f}%: loss={loss:.2f}, classificationLoss={classificationLoss.item():.2f}, onlineLoss={onlineLoss.item():.4f}")
 
 def TestEpoch(model, device, dataset):
     model.eval() # Disable dropout
@@ -52,7 +52,7 @@ def TestEpoch(model, device, dataset):
     print(f"Evaluation: loss={testLoss:2f}, accuracy={accuracy * 100:.1f}%")
 
 def main():
-    mode = "pretrain" #Todo: get from cmdline args
+    mode = "pretrain" # Todo: get from cmdline args
 
     config = Config.GetConfig()
 
@@ -82,5 +82,5 @@ def main():
     else:
         raise NotImplementedError
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
