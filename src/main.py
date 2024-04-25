@@ -15,23 +15,40 @@ def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch
     maxBatches = dataset.trainBatchCount()
 
     for batchIndex, (data, target) in enumerate(dataset.trainingEnumeration()):
-        data = augmenter.createImagePairBatch(data)
-        data, target = data.to(device), target.to(device)
+        dataView1, dataView2 = augmenter.createImagePairBatch(data)
+        dataView1, dataView2, target = dataView1.to(device), dataView2.to(device), target.to(device)
 
         optimizer.zero_grad()
-        loss = model(data)
+        loss = model(dataView1, dataView2, target)
         loss.backward()
         optimizer.step()
+        #model.stepEMA()
 
         checkpointer.update(model, optimizer, epoch, maxEpochs, batchIndex, maxBatches)
 
         #Todo: let the checkpointer or so show this, or at least allow for configuration
         if batchIndex % 10 == 0:
             print(
-                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxBatches * 100:.1f}%: loss={loss:.2f}")
+                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxBatches / dataset.batchSize * 100:.1f}%: loss={loss:.2f}")
 
 def TestEpoch(model, device, dataset):
-    pass
+    model.test() # Disable dropout
+
+    testLoss = 0
+    accuracy = 0
+
+    with torch.no_grad():
+        for data, target in enumerate(dataset.testingEnumeration()):
+            data, target = data.to(device), target.to(device)
+            output, prediction, loss = model.eval(data, target)
+
+            testLoss += loss.item()
+            accuracy += prediction.eq(target.view_as(prediction)).sum().item()
+
+    testLoss /= dataset.testBatchCount()
+    accuracy /= dataset.testBatchCount()
+
+    print(f"Evaluation: loss={testLoss:2f}, accuracy={accuracy * 100:.1f}%")
 
 def main():
     mode = "pretrain" #Todo: get from cmdline args
@@ -42,7 +59,8 @@ def main():
     device = torch.device(config["device"])
 
     dataset = Dataset.Dataset(**config["dataset"])
-    model = Model.BYOL(**config["model"]).to(device)
+    ema = Model.EMA(**config["EMA"])
+    model = Model.BYOL(ema, **config["model"]).to(device)
     checkpointer = Checkpointer.Checkpointer(**config["checkpointer"])
 
     # Todo: scheduler

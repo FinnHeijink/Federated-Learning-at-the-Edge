@@ -19,6 +19,10 @@ class Checkpointer:
         self.checkPointEveryNSecs = checkPointEveryNSecs
         self.checkPointEveryNBatches = checkPointEveryNBatches
 
+        self.lastEpoch = -1
+        self.lastBatch = -1
+        self.lastCheckpointTime = -1
+
     def getModelCheckpointPath(self):
         return path.join(self.directory, "Model.pt")
 

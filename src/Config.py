@@ -13,6 +13,9 @@ def GetConfig():
             datasetName="MNIST",
             batchSize=64
         ),
+        EMA=dict(
+            initialTau=0.95
+        ),
         model=dict(
             classCount=10,
             projector=dict(
