@@ -41,7 +41,8 @@ def GetConfig():
         ),
         checkpointer=dict(
             directory="src/checkpoints",
-            checkpointMode=Checkpointer.CheckpointMode.EVERY_N_SECS,
+            #checkpointMode=Checkpointer.CheckpointMode.EVERY_N_SECS,
+            checkpointMode=Checkpointer.CheckpointMode.EVERY_EPOCH,
             checkPointEveryNSecs=30
         )
     )

@@ -12,14 +12,14 @@ def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch
 
     print(f"Epoch {epoch + 1}: lr={optimizer.param_groups[0]['lr']}")
 
-    maxBatches = dataset.trainBatchCount()
+    maxBatches = dataset.trainBatchCount() / dataset.batchSize
 
     for batchIndex, (data, target) in enumerate(dataset.trainingEnumeration()):
         dataView1, dataView2 = augmenter.createImagePairBatch(data)
         dataView1, dataView2, target = dataView1.to(device), dataView2.to(device), target.to(device)
 
         optimizer.zero_grad()
-        loss = model(dataView1, dataView2, target)
+        loss, classificationLoss, onlineLoss = model(dataView1, dataView2, target)
         loss.backward()
         optimizer.step()
         #model.stepEMA()
@@ -29,24 +29,25 @@ def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch
         #Todo: let the checkpointer or so show this, or at least allow for configuration
         if batchIndex % 10 == 0:
             print(
-                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxBatches / dataset.batchSize * 100:.1f}%: loss={loss:.2f}")
+                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxBatches * 100:.1f}%: loss={loss:.2f}, classificationLoss={classificationLoss.item():.2f}, onlineLoss={onlineLoss.item():.2f}")
 
 def TestEpoch(model, device, dataset):
-    model.test() # Disable dropout
+    model.eval() # Disable dropout
 
     testLoss = 0
     accuracy = 0
-
     with torch.no_grad():
-        for data, target in enumerate(dataset.testingEnumeration()):
+        for batchIndex, (data, target) in enumerate(dataset.testingEnumeration()):
             data, target = data.to(device), target.to(device)
-            output, prediction, loss = model.eval(data, target)
+            output, prediction, loss = model.predictEval(data, target)
 
             testLoss += loss.item()
-            accuracy += prediction.eq(target.view_as(prediction)).sum().item()
+            accuracy += prediction.eq(target.view_as(prediction)).sum().item() / len(data)
 
-    testLoss /= dataset.testBatchCount()
-    accuracy /= dataset.testBatchCount()
+    maxBatches = dataset.testBatchCount() / dataset.batchSize
+
+    testLoss /= maxBatches
+    accuracy /= maxBatches
 
     print(f"Evaluation: loss={testLoss:2f}, accuracy={accuracy * 100:.1f}%")
 

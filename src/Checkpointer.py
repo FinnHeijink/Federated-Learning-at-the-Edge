@@ -15,7 +15,7 @@ class Checkpointer:
 
     def __init__(self, directory, checkpointMode, saveOptimizerData=False, checkPointEveryNSecs=0, checkPointEveryNBatches=0):
         self.directory = directory
-        self.checkpointMode = checkpointMode
+        self.mode = checkpointMode
         self.saveOptimizerData = saveOptimizerData
         self.checkPointEveryNSecs = checkPointEveryNSecs
         self.checkPointEveryNBatches = checkPointEveryNBatches

@@ -84,7 +84,7 @@ class BYOL(nn.Module):
         self.predictor = Predictor(inputSize=self.onlineProjector.getOutputSize(), outputSize=self.targetProjector.getOutputSize(), **predictor)
         self.classifier = Classifier(inputSize=self.onlineEncoder.getOutputSize(), outputSize=classCount, **classifier)
 
-    def eval(self, x, target):
+    def predictEval(self, x, target):
         output = self.classifier(self.onlineEncoder(x))
         prediction = output.argmax(dim=1, keepdim=True)
         loss = nll_loss(output, target)
@@ -117,7 +117,7 @@ class BYOL(nn.Module):
 
         loss = onlineLoss + classificationLoss
 
-        return loss
+        return loss, classificationLoss, onlineLoss
 
     def stepEMA(self):
         self.ema.apply(self.onlineParameters(), self.targetParameters())
