@@ -1,6 +1,9 @@
 import torch
 import torch.optim as optim
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 import Checkpointer
 import Model
 import Config
@@ -18,9 +21,16 @@ def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch
         dataView1, dataView2 = augmenter.createImagePairBatch(data)
         dataView1, dataView2, target = dataView1.to(device), dataView2.to(device), target.to(device)
 
+        #for image1, image2 in zip(dataView1, dataView2):
+        #    plt.imshow(np.squeeze(image1.detach().cpu().numpy()))
+        #    plt.show()
+        #    plt.imshow(np.squeeze(image2.detach().cpu().numpy()))
+        #    plt.show()
+        #    break
+
         optimizer.zero_grad()
         loss, classificationLoss, onlineLoss = model(dataView1, dataView2, target)
-        loss.backward()
+        (onlineLoss + classificationLoss * 0.01).backward()
         optimizer.step()
         model.stepEMA()
 
