@@ -30,8 +30,7 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
 
         # Todo: let the checkpointer or so show this, or at least allow for configuration
         if batchIndex % 10 == 0:
-            print(
-                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxTrainBatches * 100:.1f}%: BYOLLoss={loss:.4f}")
+            print(f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxTrainBatches * 100:.1f}%: BYOLLoss={loss:.4f}")
 
 def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, epoch, maxEpochs):
     classifier.train()
@@ -94,7 +93,7 @@ def main():
         augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
         for epoch in range(0, config["training"]["epochs"]):
-            TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, checkpointer, epoch, config["training"]["epochs"])
+                TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, checkpointer, epoch, config["training"]["epochs"])
             classifier.copyEncoderFromBYOL(byol)
             TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, checkpointer, epoch, config["training"]["epochs"])
             if config["training"]["evaluateEveryEpoch"]:
