@@ -1,4 +1,7 @@
 import socket
+import torch
+import struct
+import io
 
 class Communication:
     def __init__(self):
@@ -11,7 +14,22 @@ class Communication:
         self.socket.close()
 
     def sendModel(self, stateDict):
-        pass
+        bytesStream = io.BytesIO()
+        torch.save(stateDict, bytesStream)
+
+        data = bytesStream.getvalue()
+        length = len(data)
+
+        packedLength = struct.pack("!i", length)
+
+        self.socket.send(packedLength)
+        self.socket.send(data)
 
     def receiveModel(self, stateDict):
-        pass
+        packedLength = self.socket.recv(4)
+        length = struct.unpack("!i", packedLength)
+
+        data = self.socket.recv(length)
+
+        bytesReadStream = io.BytesIO(data)
+        torch.load(bytesReadStream, self.model.state_dict())

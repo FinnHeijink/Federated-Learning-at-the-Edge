@@ -1,6 +1,9 @@
 import torch
 import torch.optim as optim
 
+import pickle
+import io
+
 import Dataset
 import Config
 import Model
@@ -21,7 +24,7 @@ class DatasetDataSource(DataSource):
     def __init__(self, config):
         self.dataset = Dataset.Dataset(**config["dataset"])
 
-        self.len = len(self.dataset)
+        self.len = self.dataset.trainBatchCount() / self.dataset.batchSize
         self.index = 0
 
     def startEpoch(self):
@@ -45,7 +48,7 @@ class Client:
 
         self.augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
-        self.communication = Communication()
+        self.communication = Communication.Communication()
 
     def connect(self, port):
         self.communication.connect(port)
@@ -56,6 +59,7 @@ class Client:
         epoch = 0
 
         while not shouldStop and epoch < self.config["training"]["epochs"]:
+
             self.communication.receiveModel(self.model.state_dict())
 
             self.dataSource.startEpoch()
@@ -81,6 +85,7 @@ class Client:
             self.communication.sendModel(self.model.state_dict())
 
         self.communication.close()
+        torch.load()
 
 def main():
     config = Config.GetConfig()
