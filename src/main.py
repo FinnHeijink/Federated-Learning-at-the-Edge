@@ -93,12 +93,11 @@ def main():
         augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
         for epoch in range(0, config["training"]["epochs"]):
-                TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, checkpointer, epoch, config["training"]["epochs"])
+            TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, checkpointer, epoch, config["training"]["epochs"])
             classifier.copyEncoderFromBYOL(byol)
             TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, checkpointer, epoch, config["training"]["epochs"])
             if config["training"]["evaluateEveryEpoch"]:
                 TestEpoch(classifier, device, dataset)
-
     elif mode == "eval":
         checkpointer.loadLastCheckpoint(byol, classifier, None, None)
         classifier.copyEncoderFromBYOL(byol)
