@@ -1,9 +1,6 @@
 import torch
 import torch.optim as optim
 
-import pickle
-import io
-
 import Dataset
 import Config
 import Model
@@ -50,8 +47,8 @@ class Client:
 
         self.communication = Communication.Communication()
 
-    def connect(self, port):
-        self.communication.connect(port)
+    def connect(self, ip, port):
+        self.communication.connect(ip, port)
 
     def run(self):
         shouldStop = False
@@ -85,7 +82,6 @@ class Client:
             self.communication.sendModel(self.model.state_dict())
 
         self.communication.close()
-        torch.load()
 
 def main():
     config = Config.GetConfig()
@@ -96,7 +92,7 @@ def main():
     dataSource = DatasetDataSource(config)
     client = Client(device, config, dataSource)
 
-    client.connect(1234)
+    client.connect('localhost', 1234)
     client.run()
 
 if __name__ == "__main__":
