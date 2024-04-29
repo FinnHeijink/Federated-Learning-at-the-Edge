@@ -18,7 +18,7 @@ def GetConfig():
             datasetName="MNIST",
             normalization=None, #autoset
             batchSize=64,
-            classificationSplit=0.01,
+            classificationSplit=0.9,
         ),
         EMA=dict(
             initialTau=0.95

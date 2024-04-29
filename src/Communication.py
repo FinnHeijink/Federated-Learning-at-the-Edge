@@ -3,9 +3,27 @@ import torch
 import struct
 import io
 
-class Communication:
+class Server:
     def __init__(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def bind(self, ip, port):
+        self.socket.bind((ip, port))
+
+    def close(self):
+        self.socket.close()
+
+    def acceptClient(self):
+        self.socket.listen()
+        clientSocket, addr = self.socket.accept()
+        return Communication(clientSocket), addr
+
+class Communication:
+    def __init__(self, initialSocket = None):
+        if initialSocket == None:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        else:
+            self.socket = initialSocket
 
     def connect(self, ip, port):
         self.socket.connect((ip, port))
@@ -27,7 +45,7 @@ class Communication:
 
     def receiveModel(self, stateDict):
         packedLength = self.socket.recv(4)
-        length = struct.unpack("!i", packedLength)
+        length = struct.unpack("!i", packedLength)[0]
 
         data = self.socket.recv(length)
 
