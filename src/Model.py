@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss
+from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss, normalize
 from itertools import chain
 
 class MLP(nn.Module):
@@ -34,6 +34,16 @@ class Classifier(nn.Module):
 
     def forward(self, x):
         return log_softmax(self.mlp(x), dim=1)
+
+
+class Classifier2(nn.Module):
+    def __init__(self, inputSize, hiddenSize, outputSize, batchNorm):
+        super(Classifier2, self).__init__()
+
+        self.fc = nn.Linear(inputSize, outputSize)
+
+    def forward(self, x):
+        return log_softmax(self.fc(x), dim=1)
 
 class Encoder(nn.Module):
     def __init__(self, imageDims, imageChannels, outputChannels=64, hiddenChannels=32, kernelSize=3):
@@ -76,13 +86,18 @@ class BYOL(nn.Module):
         self.onlineProjector = MLP(inputSize=self.onlineEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
         self.targetProjector = MLP(inputSize=self.targetEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
         self.predictor = MLP(inputSize=self.onlineProjector.getOutputSize(), outputSize=self.targetProjector.getOutputSize(), batchNorm=batchNorm, **predictor)
-        self.classifier = Classifier(inputSize=self.onlineEncoder.getOutputSize(), outputSize=classCount, batchNorm=batchNorm, **classifier)
+        self.classifier = Classifier2(inputSize=self.onlineEncoder.getOutputSize(), outputSize=classCount, batchNorm=batchNorm, **classifier)
+
+        self.classifierEncoder = Encoder(**encoder)
 
         # Make sure the target network starts out the same as the online network
         for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
             targetParam.requires_grad = False
             onlineParam.requires_grad = False
             targetParam.data = onlineParam.data
+
+        for classifierParam in self.classifierEncoder.parameters():
+            classifierParam.requires_grad = False
 
     def predictEval(self, x, target):
         output = self.classifier(self.onlineEncoder(x))
@@ -103,21 +118,24 @@ class BYOL(nn.Module):
         image1Predicted = self.predictor(image1Online)
         with torch.no_grad():
             image1Target = self.targetProjector(self.targetEncoder(dataView1)).detach()
-        image1Classified = self.classifier(image1OnlineEncoded.detach())
+        image1Classified = self.classifier(self.classifierEncoder(dataView1).detach())
 
         image2OnlineEncoded = self.onlineEncoder(dataView2)
         image2Online = self.onlineProjector(image2OnlineEncoded)
         image2Predicted = self.predictor(image2Online)
         with torch.no_grad():
             image2Target = self.targetProjector(self.targetEncoder(dataView2)).detach()
-        image2Classified = self.classifier(image2OnlineEncoded.detach())
+        image2Classified = self.classifier(self.classifierEncoder(dataView2).detach())
 
         classificationLoss = (nll_loss(image1Classified, target) + nll_loss(image2Classified, target)) / 2
 
         def MSELoss(a, b):
-            return torch.square(a - b).sum()/a.shape[1]
+            return torch.mean(torch.square(a - b))
 
-        onlineLoss = (MSELoss(image1Predicted, image2Target) + MSELoss(image2Predicted, image1Target)) / 2
+        def RegressionLoss(a, b):
+            return MSELoss(normalize(a, dim=1), normalize(b, dim=1))
+
+        onlineLoss = (RegressionLoss(image1Predicted, image2Target) + RegressionLoss(image2Predicted, image1Target)) / 2
 
         loss = onlineLoss + classificationLoss
 
@@ -125,6 +143,10 @@ class BYOL(nn.Module):
 
     def stepEMA(self):
         self.ema.apply(self.onlineParameters(), self.targetParameters())
+
+    def copyClassifierEncoder(self):
+        for classifierParam, onlineParam in zip(self.classifierEncoder.parameters(), self.onlineEncoder.parameters()):
+            classifierParam.data = onlineParam.data
 
     def trainableParameters(self):
         return chain(

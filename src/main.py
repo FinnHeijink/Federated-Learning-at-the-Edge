@@ -18,7 +18,7 @@ def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch
     maxBatches = dataset.trainBatchCount() / dataset.batchSize
 
     for batchIndex, (data, target) in enumerate(dataset.trainingEnumeration()):
-        dataView1, dataView2 = augmenter.createImagePairBatch(data)
+        dataView1, dataView2 = augmenter.createImagePairBatchSingleAugment(data)
         dataView1, dataView2, target = dataView1.to(device), dataView2.to(device), target.to(device)
 
         #for image1, image2 in zip(dataView1, dataView2):
@@ -28,9 +28,11 @@ def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch
         #    plt.show()
         #    break
 
+        model.copyClassifierEncoder()
+
         optimizer.zero_grad()
         loss, classificationLoss, onlineLoss = model(dataView1, dataView2, target)
-        (onlineLoss + classificationLoss * 0.01).backward()
+        (loss + classificationLoss * 0.01).backward()
         optimizer.step()
         model.stepEMA()
 

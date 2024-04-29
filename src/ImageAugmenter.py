@@ -14,3 +14,6 @@ class ImageAugmenter:
 
     def createImagePairBatch(self, imageBatch):
         return torch.stack([self.transform(image) for image in imageBatch]), torch.stack([self.transform(image) for image in imageBatch])
+
+    def createImagePairBatchSingleAugment(self, imageBatch):
+        return imageBatch, torch.stack([self.transform(image) for image in imageBatch])

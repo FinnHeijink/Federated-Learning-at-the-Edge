@@ -3,10 +3,10 @@ from torchvision import datasets, transforms
 
 class Dataset:
 
-    def __init__(self, datasetName, batchSize):
+    def __init__(self, datasetName, batchSize, normalization):
 
         # Todo: make generic
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(normalization[0], normalization[1])])
 
         self.train = getattr(datasets, datasetName)('datasets', train=True, download=True, transform=transform)
         self.test = getattr(datasets, datasetName)('datasets', train=False, transform=transform)

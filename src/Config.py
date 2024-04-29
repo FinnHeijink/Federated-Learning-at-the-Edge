@@ -1,16 +1,17 @@
 import Checkpointer
 
 def GetConfig():
-    return dict(
+    config = dict(
         device="cuda",
-        imageDims=(28, 28),
+        imageDims=(0, 0), #autoset
 
         training=dict(
             epochs=40,
             evaluateEveryEpoch=True,
         ),
         dataset=dict(
-            datasetName="MNIST",
+            datasetName="CIFAR10",
+            normalization=None, #autoset
             batchSize=64
         ),
         EMA=dict(
@@ -29,8 +30,8 @@ def GetConfig():
                 hiddenSize=10
             ),
             encoder=dict(
-                imageDims=(28, 28),
-                imageChannels=1
+                imageDims=(0, 0), #autoset
+                imageChannels=0 #autoset
             ),
             batchNorm=dict(
                 eps=1e-5,
@@ -50,3 +51,18 @@ def GetConfig():
             checkPointEveryNSecs=30
         )
     )
+
+    if config["dataset"]["datasetName"] == "MNIST":
+        config["imageDims"] = (28, 28)
+        config["dataset"]["normalization"] = ((0.1307,), (0.3081,))
+        config["model"]["encoder"]["imageDims"] = (28, 28)
+        config["model"]["encoder"]["imageChannels"] = 1
+    elif config["dataset"]["datasetName"] == "CIFAR10":
+        config["imageDims"] = (32, 32)
+        config["dataset"]["normalization"] = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        config["model"]["encoder"]["imageDims"] = (32, 32)
+        config["model"]["encoder"]["imageChannels"] = 3
+    else:
+        raise NotImplementedError
+
+    return config
