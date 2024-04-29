@@ -53,7 +53,7 @@ class Checkpointer:
         else:
             raise NotImplementedError
 
-    def loadLastCheckpoint(self, model, optimizer):
+    def loadLastCheckpoint(self, byol, classifier, byolOptimizer, classifierOptimizer):
         pass
 
     def saveCheckpoint(self, model, optimizer):

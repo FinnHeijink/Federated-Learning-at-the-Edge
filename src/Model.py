@@ -28,22 +28,41 @@ class MLP(nn.Module):
         return self.hiddenSize
 
 class Classifier(nn.Module):
-    def __init__(self, inputSize, hiddenSize, outputSize, batchNorm):
+    def __init__(self, classCount, encoder, batchNorm):
         super(Classifier, self).__init__()
-        self.mlp = MLP(inputSize, hiddenSize, outputSize, batchNorm)
+
+        self.encoder = Encoder(**encoder)
+        self.fc = nn.Linear(self.encoder.getOutputSize(), classCount)
+
+        for param in self.encoder.parameters():
+            param.requires_grad = False
 
     def forward(self, x):
-        return log_softmax(self.mlp(x), dim=1)
+        with torch.no_grad():
+            encoded = self.encoder(x).detach()
 
+        return log_softmax(self.fc(encoded), dim=1)
 
-class Classifier2(nn.Module):
-    def __init__(self, inputSize, hiddenSize, outputSize, batchNorm):
-        super(Classifier2, self).__init__()
+    def loss(self, x, target):
+        return nll_loss(self(x), target)
 
-        self.fc = nn.Linear(inputSize, outputSize)
+    def predict(self, x):
+        output = self(x)
+        prediction = output.argmax(dim=1, keepdim=True)
+        return output, prediction
 
-    def forward(self, x):
-        return log_softmax(self.fc(x), dim=1)
+    def predictionLoss(self, x, target):
+        output = self(x)
+        prediction = output.argmax(dim=1, keepdim=True)
+        loss = nll_loss(output, target)
+        return loss, output, prediction
+
+    def copyEncoderFromBYOL(self, byol):
+        for classifierParam, onlineParam in zip(self.encoder.parameters(), byol.onlineEncoderParameters()):
+            classifierParam.data = onlineParam.data
+
+    def trainableParameters(self):
+        return self.fc.parameters() # Todo: what if we add an another layer? Automate
 
 class Encoder(nn.Module):
     def __init__(self, imageDims, imageChannels, outputChannels=64, hiddenChannels=32, kernelSize=3):
@@ -54,9 +73,7 @@ class Encoder(nn.Module):
 
         self.conv1 = nn.Conv2d(imageChannels, hiddenChannels, kernelSize, 1)
         self.conv2 = nn.Conv2d(hiddenChannels, outputChannels, kernelSize, 1)
-        self.dropout = nn.Dropout(0)
-
-        # self.fc = nn.Linear(self.getOutputSize(), self.getOutputSize())
+        self.dropout = nn.Dropout(0.2)
 
     def getOutputSize(self):
         return self.outputChannels * (self.imageDims[0] - 4) // 2 * (self.imageDims[1] - 4) // 2 #-4 due to the two 3x3 kernels, / 2 due to the pooling
@@ -67,53 +84,22 @@ class Encoder(nn.Module):
         x = self.dropout(max_pool2d(x, 2))
         return torch.flatten(x, 1)
 
-class EMA:
-    def __init__(self, initialTau):
-        self.tau = initialTau
-
-    def apply(self, online, target):
-        for onlineParam, targetParam in zip(online, target):
-            targetParam.data  = targetParam.data + (onlineParam.data - targetParam.data) * (1.0 - self.tau)
-
 class BYOL(nn.Module):
-    def __init__(self, ema, classCount, predictor, projector, classifier, encoder, batchNorm):
+    def __init__(self, initialTau, predictor, projector, encoder, batchNorm):
         super(BYOL, self).__init__()
 
-        self.ema = ema
+        self.tau = initialTau
 
         self.onlineEncoder = Encoder(**encoder)
         self.targetEncoder = Encoder(**encoder)
-        self.classifierEncoder = Encoder(**encoder)
         self.onlineProjector = MLP(inputSize=self.onlineEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
         self.targetProjector = MLP(inputSize=self.targetEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
         self.predictor = MLP(inputSize=self.onlineProjector.getOutputSize(), outputSize=self.targetProjector.getOutputSize(), batchNorm=batchNorm, **predictor)
-        self.classifier = Classifier2(inputSize=self.onlineEncoder.getOutputSize(), outputSize=classCount, batchNorm=batchNorm, **classifier)
 
         # Make sure the target network starts out the same as the online network
         for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
             targetParam.requires_grad = False
             targetParam.data = onlineParam.data
-
-        for classifierParam in self.classifierEncoder.parameters():
-            classifierParam.requires_grad = False
-
-    def predictionLoss(self, x, target):
-        output = self.classifier(self.onlineEncoder(x))
-        prediction = output.argmax(dim=1, keepdim=True)
-        loss = nll_loss(output, target)
-        return loss, output, prediction
-
-    def predict(self, x):
-        output = self.classifier(self.onlineEncoder(x))
-        prediction = output.argmax(dim=1, keepdim=True)
-        return output, prediction
-
-    def classificationLoss(self, x, target):
-        with torch.no_grad():
-            encoded = self.classifierEncoder(x)
-
-        output = self.classifier(encoded.detach())
-        return nll_loss(output, target)
 
     def forward(self, dataView1, dataView2, target):
         # dimensions of dataView1,2: [batchSize, channelCount, imageWidth, imageHeight]
@@ -141,18 +127,14 @@ class BYOL(nn.Module):
         return onlineLoss
 
     def stepEMA(self):
-        self.ema.apply(self.onlineParameters(), self.targetParameters())
-
-    def copyClassifierEncoder(self):
-        for classifierParam, onlineParam in zip(self.classifierEncoder.parameters(), self.onlineEncoder.parameters()):
-            classifierParam.data = onlineParam.data
+        for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
+            targetParam.data = targetParam.data + (onlineParam.data - targetParam.data) * (1.0 - self.tau)
 
     def trainableParameters(self):
         return chain(
             self.onlineEncoder.parameters(),
             self.onlineProjector.parameters(),
             self.predictor.parameters(),
-            self.classifier.parameters()
         )
 
     def onlineParameters(self):
@@ -168,3 +150,6 @@ class BYOL(nn.Module):
             self.targetEncoder.parameters(),
             self.targetProjector.parameters()
         )
+
+    def onlineEncoderParameters(self):
+        return self.onlineEncoder.parameters()
