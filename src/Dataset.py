@@ -3,7 +3,7 @@ from torchvision import datasets, transforms
 
 class Dataset:
 
-    def __init__(self, datasetName, batchSize, normalization):
+    def __init__(self, datasetName, batchSize, normalization, classificationSplit):
 
         # Todo: make generic
         transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(normalization[0], normalization[1])])
@@ -11,7 +11,7 @@ class Dataset:
         self.train = getattr(datasets, datasetName)('datasets', train=True, download=True, transform=transform)
         self.test = getattr(datasets, datasetName)('datasets', train=False, transform=transform)
 
-        self.train, self.classification = torch.utils.data.random_split(self.train, [0.99, 0.01])
+        self.train, self.classification = torch.utils.data.random_split(self.train, [1 - classificationSplit, classificationSplit])
 
         self.trainLoader = torch.utils.data.DataLoader(self.train, batch_size=batchSize)
         self.classificationLoader = torch.utils.data.DataLoader(self.classification, batch_size=batchSize)

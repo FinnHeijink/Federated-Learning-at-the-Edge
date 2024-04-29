@@ -94,7 +94,7 @@ def main():
     if mode == "pretrain":
         optimizer = getattr(optim, config["optimizer"]["name"])(model.trainableParameters(), **config["optimizer"]["settings"])
         checkpointer.loadLastCheckpoint(model, optimizer)
-        augmenter = ImageAugmenter.ImageAugmenter(imageDims=config["imageDims"])
+        augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
         for epoch in range(0, config["training"]["epochs"]):
             TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch, config["training"]["epochs"])

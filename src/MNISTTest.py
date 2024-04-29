@@ -19,10 +19,7 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(9216, 128)
         self.fc2 = nn.Linear(128, 10)
 
-        self.simple = nn.Linear(28*28, 10)
-
     def forward(self, x):
-        return log_softmax(self.simple(torch.flatten(x, 1)), dim=1)
         x = relu(self.conv1(x))
         x = relu(self.conv2(x))
         x = self.dropout1(max_pool2d(x, 2))
