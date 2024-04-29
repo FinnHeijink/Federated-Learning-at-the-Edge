@@ -32,4 +32,4 @@ class Communication:
         data = self.socket.recv(length)
 
         bytesReadStream = io.BytesIO(data)
-        torch.load(bytesReadStream, self.model.state_dict())
+        torch.load(bytesReadStream, stateDict)
