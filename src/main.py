@@ -15,8 +15,7 @@ def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch
 
     print(f"Epoch {epoch + 1}: lr={optimizer.param_groups[0]['lr']}")
 
-    maxBatches = dataset.trainBatchCount() / dataset.batchSize
-
+    maxTrainBatches = dataset.trainBatchCount() / dataset.batchSize
     for batchIndex, (data, target) in enumerate(dataset.trainingEnumeration()):
         dataView1, dataView2 = augmenter.createImagePairBatchSingleAugment(data)
         dataView1, dataView2, target = dataView1.to(device), dataView2.to(device), target.to(device)
@@ -28,20 +27,34 @@ def TrainEpoch(model, device, dataset, optimizer, augmenter, checkpointer, epoch
         #    plt.show()
         #    break
 
-        model.copyClassifierEncoder()
-
         optimizer.zero_grad()
-        loss, classificationLoss, onlineLoss = model(dataView1, dataView2, target)
-        (loss + classificationLoss * 0.01).backward()
+        loss = model(dataView1, dataView2, target)
+        loss.backward()
         optimizer.step()
         model.stepEMA()
 
-        checkpointer.update(model, optimizer, epoch, maxEpochs, batchIndex, maxBatches)
+        checkpointer.update(model, optimizer, epoch, maxEpochs, batchIndex, maxTrainBatches)
 
-        #Todo: let the checkpointer or so show this, or at least allow for configuration
+        # Todo: let the checkpointer or so show this, or at least allow for configuration
         if batchIndex % 10 == 0:
             print(
-                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxBatches * 100:.1f}%: loss={loss:.2f}, classificationLoss={classificationLoss.item():.2f}, onlineLoss={onlineLoss.item():.4f}")
+                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxTrainBatches * 100:.1f}%: BYOLLoss={loss:.4f}")
+
+    print("Training Classifier...")
+    model.copyClassifierEncoder()
+
+    maxClassifierBatches = dataset.classificationBatchCount() / dataset.batchSize
+    for batchIndex, (data, target) in enumerate(dataset.classificationEnumeration()):
+        data, target = data.to(device), target.to(device)
+
+        optimizer.zero_grad()
+        loss = model.classificationLoss(data, target)
+        loss.backward()
+        optimizer.step()
+
+        if batchIndex % 10 == 0:
+            print(
+                f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxClassifierBatches * 100:.1f}%: classificationLoss={loss:.2f}")
 
 def TestEpoch(model, device, dataset):
     model.eval() # Disable dropout
@@ -51,7 +64,7 @@ def TestEpoch(model, device, dataset):
     with torch.no_grad():
         for batchIndex, (data, target) in enumerate(dataset.testingEnumeration()):
             data, target = data.to(device), target.to(device)
-            output, prediction, loss = model.predictEval(data, target)
+            loss, output, prediction = model.predictionLoss(data, target)
 
             testLoss += loss.item()
             accuracy += prediction.eq(target.view_as(prediction)).sum().item() / len(data)

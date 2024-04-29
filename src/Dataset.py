@@ -11,7 +11,10 @@ class Dataset:
         self.train = getattr(datasets, datasetName)('datasets', train=True, download=True, transform=transform)
         self.test = getattr(datasets, datasetName)('datasets', train=False, transform=transform)
 
+        self.train, self.classification = torch.utils.data.random_split(self.train, [0.99, 0.01])
+
         self.trainLoader = torch.utils.data.DataLoader(self.train, batch_size=batchSize)
+        self.classificationLoader = torch.utils.data.DataLoader(self.classification, batch_size=batchSize)
         self.testLoader = torch.utils.data.DataLoader(self.test, batch_size=batchSize)
 
         self.batchSize = batchSize
@@ -19,11 +22,17 @@ class Dataset:
     def trainingEnumeration(self):
         return self.trainLoader
 
+    def classificationEnumeration(self):
+        return self.classificationLoader
+
     def testingEnumeration(self):
         return self.testLoader
 
     def trainBatchCount(self):
         return len(self.trainLoader.dataset)
+
+    def classificationBatchCount(self):
+        return len(self.classificationLoader.dataset)
 
     def testBatchCount(self):
         return len(self.testLoader.dataset)

@@ -10,7 +10,7 @@ def GetConfig():
             evaluateEveryEpoch=True,
         ),
         dataset=dict(
-            datasetName="CIFAR10",
+            datasetName="MNIST",
             normalization=None, #autoset
             batchSize=64
         ),
