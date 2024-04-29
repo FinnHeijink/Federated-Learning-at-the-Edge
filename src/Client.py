@@ -1,12 +1,11 @@
 import torch
 import torch.optim as optim
 
-import socket
-
 import Dataset
 import Config
 import Model
 import ImageAugmenter
+import Communication
 
 class DataSource:
     def startEpoch(self):
@@ -46,10 +45,10 @@ class Client:
 
         self.augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.communication = Communication()
 
     def connect(self, port):
-        self.socket.connect(('localhost', port))
+        self.communication.connect(port)
 
     def run(self):
         shouldStop = False
@@ -57,7 +56,7 @@ class Client:
         epoch = 0
 
         while not shouldStop and epoch < self.config["training"]["epochs"]:
-            self.receiveModel()
+            self.communication.receiveModel(self.model.state_dict())
 
             self.dataSource.startEpoch()
 
@@ -79,16 +78,9 @@ class Client:
 
             epoch = epoch + 1
 
-            self.sendModel()
+            self.communication.sendModel(self.model.state_dict())
 
-        self.socket.close()
-
-    def receiveModel(self):
-        torch.load(self.socket, self.model_state_dict())
-        pass
-
-    def sendModel(self):
-        torch.save(self.model.state_dict(), self.socket)
+        self.communication.close()
 
 def main():
     config = Config.GetConfig()
