@@ -64,7 +64,7 @@ class Client:
         while not shouldStop and epoch < self.config["training"]["epochs"]:
 
             print("Loading model from server")
-            self.communication.receiveModel(self.model.state_dict())
+            self.communication.receiveModel(self.model)
 
             print(f"Training BYOL Epoch {epoch + 1}: lr={self.optimizer.param_groups[0]['lr']}")
             self.dataSource.startEpoch()
@@ -81,21 +81,21 @@ class Client:
                 self.optimizer.step()
                 self.model.stepEMA()
 
-                if batchIndex % 10 == 0:
+                if batchIndex % 50 == 0:
                     print(f"Epoch {epoch + 1}, batch {batchIndex}/{self.dataSource.getProgress() * 100:.1f}%: loss={loss:.4f}")
                 batchIndex = batchIndex + 1
 
             epoch = epoch + 1
 
             print("Sending model to server")
-            self.communication.sendModel(self.model.state_dict())
+            self.communication.sendModel(self.model)
 
         self.communication.close()
 
 def main():
     config = Config.GetConfig()
 
-    torch.manual_seed(0)
+    #torch.manual_seed(0)
     device = torch.device(config["device"])
 
     dataSource = DatasetDataSource(config)

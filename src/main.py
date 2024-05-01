@@ -46,7 +46,7 @@ def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, e
         loss.backward()
         optimizer.step()
 
-        if batchIndex % 10 == 0:
+        if batchIndex % 1 == 0:
             print(
                 f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxClassifierBatches * 100:.1f}%: classificationLoss={loss:.2f}")
 

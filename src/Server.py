@@ -53,15 +53,17 @@ class Server:
             for idx, client in enumerate(self.clients):
                 print(f"Loading model from client {idx}")
                 model = Model.BYOL(**self.config["EMA"], **self.config["BYOL"]).to(self.device)
-                client.receiveModel(model.state_dict())
+                client.receiveModel(model)
                 models.append(model)
 
             print("Averaging")
             averagedModel = Model.BYOL(**self.config["EMA"], **self.config["BYOL"]).to(self.device)
 
+            modelParameters = [list((model.parameters())) for model in models]
+
             # Todo: should we average all parameters or only the online parameters?
-            for params, toAverageParamsList in zip(averagedModel.parameters(), *[model.parameters() for model in models]):
-                params.data = torch.mean(torch.stack([x.data for x in toAverageParamsList]), dim=0)
+            for idx, param in enumerate(averagedModel.parameters()):
+                param.data = torch.mean(torch.stack([modelParameters[modelIdx][idx].data for modelIdx in range(len(models))]), dim=0)
 
             print("Sending models...")
 
@@ -72,9 +74,9 @@ class Server:
             print("Saving model")
             self.checkpointer.saveCheckpoint(averagedModel, None)
 
-            #self.classifier.copyEncoderFromBYOL(averagedModel)
-            #mainModule.TrainClassifierEpoch(self.classifier, self.device, self.dataset, self.classifierOptimizer, self.checkpointer, -1, -1)
-            #mainModule.TestEpoch(self.classifier, self.device, self.dataset)
+            self.classifier.copyEncoderFromBYOL(averagedModel)
+            mainModule.TrainClassifierEpoch(self.classifier, self.device, self.dataset, self.classifierOptimizer, self.checkpointer, -1, -1)
+            mainModule.TestEpoch(self.classifier, self.device, self.dataset)
 
         for client in self.clients:
             client.close()
@@ -86,7 +88,7 @@ def main():
     device = torch.device(config["device"])
 
     server = Server(device, config)
-    server.listenForClients("localhost", 1234, 1)
+    server.listenForClients("localhost", 1234, 2)
     server.run()
 
 if __name__ == "__main__":

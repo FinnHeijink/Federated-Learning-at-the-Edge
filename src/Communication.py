@@ -31,23 +31,35 @@ class Communication:
     def close(self):
         self.socket.close()
 
-    def sendModel(self, stateDict):
+    def sendModel(self, model):
         bytesStream = io.BytesIO()
-        torch.save(stateDict, bytesStream)
+        torch.save(model.state_dict(), bytesStream)
 
         data = bytesStream.getvalue()
         length = len(data)
 
         packedLength = struct.pack("!i", length)
 
-        self.socket.send(packedLength)
-        self.socket.send(data)
+        self.socket.sendall(packedLength)
+        self.socket.sendall(data)
 
-    def receiveModel(self, stateDict):
-        packedLength = self.socket.recv(4)
+    def receiveModel(self, model):
+        packedLength = recvall(self.socket, 4)
         length = struct.unpack("!i", packedLength)[0]
 
-        data = self.socket.recv(length)
+        data = recvall(self.socket, length)
 
         bytesReadStream = io.BytesIO(data)
-        torch.load(bytesReadStream, stateDict)
+        statesDict = model.state_dict()
+        model.load_state_dict(torch.load(bytesReadStream))
+        bytesReadStream.close()
+
+def recvall(socket, n):
+    # Helper function to recv n bytes or return None if EOF is hit
+    data = bytearray()
+    while len(data) < n:
+        packet = socket.recv(n - len(data))
+        if not packet:
+            return None
+        data.extend(packet)
+    return data
