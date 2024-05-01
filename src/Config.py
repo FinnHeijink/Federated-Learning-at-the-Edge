@@ -64,7 +64,7 @@ def GetConfig():
             epochStreamCount=16,
         ),
         client=dict(
-            serverSyncEveryNEpochs=100,
+            serverSyncEveryNEpochs=1,
             updateBufferEveryNEpochs=1
         ),
         server=dict(

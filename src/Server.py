@@ -1,6 +1,8 @@
 import torch
 import torch.optim as optim
 
+import time
+
 import Config
 import Model
 import Communication
@@ -9,6 +11,14 @@ import Dataset
 import main as mainModule # Todo: clean up
 
 class Server:
+
+    class ServerClient:
+        def __init__(self, comm, addr, model):
+            self.comm = comm
+            self.name = str(addr)
+            self.model = model
+            self.hasReceivedModel = False
+
     def __init__(self, device, config):
         self.device = device
         self.config = config
@@ -19,68 +29,91 @@ class Server:
 
         self.dataset = Dataset.Dataset(**config["dataset"])
 
-        self.clients = []
-
         self.communicationServer = Communication.Server()
 
-    def listenForClients(self, ip, port, count):
+        self.clients = []
+        self.currentModel = Model.BYOL(**self.config["EMA"], **self.config["BYOL"])
+
+    def bind(self, ip, port):
 
         self.communicationServer.bind(ip, port)
 
-        print("Listening for clients...")
-        for i in range(count):
-            client, addr = self.communicationServer.acceptClient()
-            self.clients.append(client)
+    def listenForClients(self):
 
-            print(f"Accepted client at {addr}")
+        while True:
+            comm, addr = self.communicationServer.tryAcceptClient()
+            if comm is None:
+                break
+            else:
+                print(f"Accepted client at {addr}")
+
+                client = self.ServerClient(comm, addr, Model.BYOL(**self.config["EMA"], **self.config["BYOL"]))
+                self.clients.append(client)
+                self.updateClientCommunication(client)
+
+    def updateClientCommunication(self, client):
+        if client.comm.isDataReady():
+            message = client.comm.receiveMessage()
+            if message == "stop": # Clients wants to disconnect
+                print(f"Closing client {client.name}")
+                self.clients.remove(client)
+                client.comm.close()
+            elif message == "requestSend": # Should send current model to client
+                print(f"Sending model to client {client.name}")
+                client.comm.sendModel(self.currentModel)
+            elif message == "update":
+                print(f"Receiving model from client {client.name}")
+                client.comm.receiveModel(client.model)
+                client.hasReceivedModel = True
+            else:
+                print(f"Received unknown message {message} from client {client.name}")
 
     def run(self):
-
-        # Sent a global start model first
-        print("Sending initial model")
-        initialModel = Model.BYOL(**self.config["EMA"], **self.config["BYOL"])
-
-        for client in self.clients:
-            client.sendModel(initialModel)
 
         shouldStop = False
         while not shouldStop:
 
-            models = []
+            print("Waiting for updated models...")
+            while True: # Communicate with clients until all clients have sent an updated model
+                self.listenForClients()
+                for client in self.clients:
+                    self.updateClientCommunication(client)
 
-            print("Loading models...")
+                clientsWithModelCount = 0
+                for client in self.clients:
+                    if client.hasReceivedModel:
+                        clientsWithModelCount += 1
 
-            for idx, client in enumerate(self.clients):
-                print(f"Loading model from client {idx}")
-                model = Model.BYOL(**self.config["EMA"], **self.config["BYOL"]).to(self.device)
-                client.receiveModel(model)
-                models.append(model)
+                if len(self.clients) == 0:
+                    print("Waiting for clients...")
+                elif clientsWithModelCount == len(self.clients):
+                    break
+
+                time.sleep(1)
 
             print("Averaging")
-            averagedModel = Model.BYOL(**self.config["EMA"], **self.config["BYOL"]).to(self.device)
 
-            modelParameters = [list((model.parameters())) for model in models]
+            modelParameters = [list((client.model.parameters())) for client in self.clients]
 
             # Todo: should we average all parameters or only the online parameters?
-            for idx, param in enumerate(averagedModel.parameters()):
-                param.data = torch.mean(torch.stack([modelParameters[modelIdx][idx].data for modelIdx in range(len(models))]), dim=0)
+            for idx, param in enumerate(self.currentModel.parameters()):
+                param.data = torch.mean(torch.stack([modelParameters[modelIdx][idx].data for modelIdx in range(len(modelParameters))]), dim=0)
 
-            print("Sending models...")
+            # Clear the received models to indicate we processed them
+            for client in self.clients:
+                client.hasReceivedModel = False
 
-            for idx, client in enumerate(self.clients):
-                print(f"Sending model to client {idx}")
-                client.sendModel(averagedModel)
+            # Communicate with clients to send the averaged model
+            for client in self.clients:
+                self.updateClientCommunication(client)
 
             print("Saving model")
-            self.checkpointer.saveCheckpoint(averagedModel, None)
+            self.checkpointer.saveCheckpoint(self.currentModel, None)
 
-            self.classifier.copyEncoderFromBYOL(averagedModel)
+            self.classifier.copyEncoderFromBYOL(self.currentModel)
             for i in range(self.config["server"]["classifierTrainEpochs"]):
                 mainModule.TrainClassifierEpoch(self.classifier, self.device, self.dataset, self.classifierOptimizer, self.checkpointer, -1, -1)
             mainModule.TestEpoch(self.classifier, self.device, self.dataset)
-
-        for client in self.clients:
-            client.close()
 
 def main():
     config = Config.GetConfig()
@@ -90,7 +123,7 @@ def main():
     device = torch.device(config["device"])
 
     server = Server(device, config)
-    server.listenForClients("localhost", 1234, 1)
+    server.bind("localhost", 1234)
     server.run()
 
 if __name__ == "__main__":

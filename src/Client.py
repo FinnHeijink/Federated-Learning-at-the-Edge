@@ -170,6 +170,13 @@ class Client:
         self.communication.connect(ip, port)
 
     def run(self):
+        try:
+            self.run_()
+        except KeyboardInterrupt:
+            self.communication.sendMessage("stop")
+            self.communication.close()
+
+    def run_(self):
         shouldStop = False
 
         epoch = 0
@@ -180,6 +187,7 @@ class Client:
 
             if epoch % self.config["client"]["serverSyncEveryNEpochs"] == 0:
                 print("Loading model from server")
+                self.communication.sendMessage("requestSend")
                 self.communication.receiveModel(self.model)
 
             print(f"Training BYOL Epoch {epoch + 1}: lr={self.optimizer.param_groups[0]['lr']}")
@@ -208,6 +216,7 @@ class Client:
             # Note: checking after epoch+1! We load from server at the first epoch in a sequence, and send to the server at the last of the sequence
             if epoch % self.config["client"]["serverSyncEveryNEpochs"] == 0:
                 print("Sending model to server")
+                self.communication.sendMessage("update")
                 self.communication.sendModel(self.model)
 
             if epoch % self.config["client"]["updateBufferEveryNEpochs"] == 0:
