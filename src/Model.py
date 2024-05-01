@@ -101,7 +101,7 @@ class BYOL(nn.Module):
             targetParam.requires_grad = False
             targetParam.data = onlineParam.data
 
-    def forward(self, dataView1, dataView2, target):
+    def forward(self, dataView1, dataView2):
         # dimensions of dataView1,2: [batchSize, channelCount, imageWidth, imageHeight]
 
         image1OnlineEncoded = self.onlineEncoder(dataView1)

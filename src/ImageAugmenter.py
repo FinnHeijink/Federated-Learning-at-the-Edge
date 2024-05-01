@@ -23,8 +23,13 @@ class ImageAugmenter:
                 transforms.RandomVerticalFlip(p=0.5),
             ])
 
+        self.weakTransform = transforms.RandomResizedCrop(size=imageDims, antialias=True, scale=(0.8, 1))
+
     def createImagePairBatch(self, imageBatch):
         return torch.stack([self.transform(image) for image in imageBatch]), torch.stack([self.transform(image) for image in imageBatch])
 
     def createImagePairBatchSingleAugment(self, imageBatch):
         return imageBatch, torch.stack([self.transform(image) for image in imageBatch])
+
+    def weaklyAugment(self, image):
+        return image, self.weakTransform(image)

@@ -75,7 +75,8 @@ class Server:
             self.checkpointer.saveCheckpoint(averagedModel, None)
 
             self.classifier.copyEncoderFromBYOL(averagedModel)
-            mainModule.TrainClassifierEpoch(self.classifier, self.device, self.dataset, self.classifierOptimizer, self.checkpointer, -1, -1)
+            for i in range(self.config["server"]["classifierTrainEpochs"]):
+                mainModule.TrainClassifierEpoch(self.classifier, self.device, self.dataset, self.classifierOptimizer, self.checkpointer, -1, -1)
             mainModule.TestEpoch(self.classifier, self.device, self.dataset)
 
         for client in self.clients:
@@ -83,12 +84,13 @@ class Server:
 
 def main():
     config = Config.GetConfig()
+    config["device"] = "cpu"
 
     torch.manual_seed(0)
     device = torch.device(config["device"])
 
     server = Server(device, config)
-    server.listenForClients("localhost", 1234, 2)
+    server.listenForClients("localhost", 1234, 1)
     server.run()
 
 if __name__ == "__main__":

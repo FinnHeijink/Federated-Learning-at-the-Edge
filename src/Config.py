@@ -11,17 +11,17 @@ def GetConfig():
         ),
 
         training=dict(
-            epochs=40,
+            epochs=4000,
             evaluateEveryEpoch=True,
         ),
         dataset=dict(
-            datasetName="MNIST",
+            datasetName="CIFAR10",
             normalization=None, #autoset
-            batchSize=64,
+            batchSize=32,
             classificationSplit=0.01,
         ),
         EMA=dict(
-            initialTau=0.95
+            initialTau=0.99
         ),
         classifier=dict(
             batchNorm=None #autoset
@@ -43,7 +43,7 @@ def GetConfig():
         optimizer=dict(
             name="Adam",
             settings=dict(
-                lr=0.001
+                lr=0.0001
             )
         ),
         batchNorm=dict(
@@ -55,12 +55,27 @@ def GetConfig():
             #checkpointMode=Checkpointer.CheckpointMode.EVERY_N_SECS,
             checkpointMode=Checkpointer.CheckpointMode.EVERY_EPOCH,
             checkPointEveryNSecs=30
+        ),
+        dataBuffer=dict(
+            datasetLoadBatchSize=16,
+            bufferSize=128,
+            batchSize=None, #autoset
+            lazyScoringInterval=50,
+            epochStreamCount=16,
+        ),
+        client=dict(
+            serverSyncEveryNEpochs=100,
+            updateBufferEveryNEpochs=1
+        ),
+        server=dict(
+            classifierTrainEpochs=25,
         )
     )
 
     config["BYOL"]["batchNorm"] = config["batchNorm"]
     config["classifier"]["batchNorm"] = config["batchNorm"]
     config["classifier"]["encoder"] = config["BYOL"]["encoder"]
+    config["dataBuffer"]["batchSize"] = config["dataset"]["batchSize"]
 
     if config["dataset"]["datasetName"] == "MNIST":
         config["augmenter"]["imageDims"] = (28, 28)
