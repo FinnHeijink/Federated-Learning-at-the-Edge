@@ -57,6 +57,7 @@ class Server:
             if message == "stop": # Clients wants to disconnect
                 print(f"Closing client {client.name}")
                 self.clients.remove(client)
+                client.comm.sendMessage("stopAcknowledged")
                 client.comm.close()
             elif message == "requestSend": # Should send current model to client
                 print(f"Sending model to client {client.name}")

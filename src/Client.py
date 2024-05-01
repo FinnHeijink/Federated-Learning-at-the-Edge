@@ -1,6 +1,8 @@
 import torch
 import torch.optim as optim
 
+import time
+
 import Dataset
 import Config
 import Model
@@ -174,6 +176,9 @@ class Client:
             self.run_()
         except KeyboardInterrupt:
             self.communication.sendMessage("stop")
+            while not self.communication.isDataReady():
+                time.sleep(1)
+            self.communication.receiveMessage()
             self.communication.close()
 
     def run_(self):
