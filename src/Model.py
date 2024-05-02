@@ -31,7 +31,7 @@ class Classifier(nn.Module):
     def __init__(self, classCount, encoder, encoderName, batchNorm):
         super(Classifier, self).__init__()
 
-        self.encoder = globals[encoderName](**encoder)
+        self.encoder = globals()[encoderName](**encoder)
         self.fc = nn.Linear(self.encoder.getOutputSize(), classCount)
 
         for param in self.encoder.parameters():
