@@ -105,6 +105,7 @@ class Server:
                 client.hasReceivedModel = False
 
             # Communicate with clients to send the averaged model
+            time.sleep(1) # Give clients time to process
             for client in self.clients:
                 self.updateClientCommunication(client)
 

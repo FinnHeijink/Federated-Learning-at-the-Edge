@@ -217,6 +217,10 @@ class Client:
                     print(f"Epoch {epoch + 1}, batch {batchIndex}/{self.dataSource.getProgress() * 100:.1f}%: loss={loss:.4f}")
                 batchIndex = batchIndex + 1
 
+            if epoch % self.config["client"]["updateBufferEveryNEpochs"] == 0:
+                print("Updating buffer...")
+                self.dataSource.updateBuffer(self.model, self.device)
+
             epoch = epoch + 1
 
             # Note: checking after epoch+1! We load from server at the first epoch in a sequence, and send to the server at the last of the sequence
@@ -224,10 +228,6 @@ class Client:
                 print("Sending model to server")
                 self.communication.sendMessage("update")
                 self.communication.sendModel(self.model)
-
-            if epoch % self.config["client"]["updateBufferEveryNEpochs"] == 0:
-                print("Updating buffer...")
-                self.dataSource.updateBuffer(self.model, self.device)
 
         self.communication.close()
 
