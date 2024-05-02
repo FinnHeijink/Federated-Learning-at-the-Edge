@@ -76,6 +76,7 @@ def GetConfig():
     config["BYOL"]["batchNorm"] = config["batchNorm"]
     config["classifier"]["batchNorm"] = config["batchNorm"]
     config["classifier"]["encoder"] = config["BYOL"]["encoder"]
+    config["classifier"]["encoderName"] = config["BYOL"]["encoderName"]
     config["dataBuffer"]["batchSize"] = config["dataset"]["batchSize"]
 
     if config["dataset"]["datasetName"] == "MNIST":

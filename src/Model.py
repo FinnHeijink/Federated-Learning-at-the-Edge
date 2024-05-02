@@ -28,10 +28,10 @@ class MLP(nn.Module):
         return self.hiddenSize
 
 class Classifier(nn.Module):
-    def __init__(self, classCount, encoder, batchNorm):
+    def __init__(self, classCount, encoder, encoderName, batchNorm):
         super(Classifier, self).__init__()
 
-        self.encoder = Encoder(**encoder)
+        self.encoder = globals[encoderName](**encoder)
         self.fc = nn.Linear(self.encoder.getOutputSize(), classCount)
 
         for param in self.encoder.parameters():
