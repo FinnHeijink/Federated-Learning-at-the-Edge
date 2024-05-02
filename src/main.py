@@ -21,7 +21,7 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
         dataView1, dataView2, target = dataView1.to(device), dataView2.to(device), target.to(device)
 
         optimizer.zero_grad()
-        loss = byol(dataView1, dataView2, target)
+        loss = byol(dataView1, dataView2)
         loss.backward()
         optimizer.step()
         byol.stepEMA()
