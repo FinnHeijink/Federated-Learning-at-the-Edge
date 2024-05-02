@@ -76,7 +76,7 @@ def main():
     config = Config.GetConfig()
 
     torch.manual_seed(0)
-    device = torch.device(config["device"])
+    device = Util.GetDeviceFromConfig(config)
 
     dataset = Dataset.Dataset(**config["dataset"])
     byol = Model.BYOL(**config["EMA"], **config["BYOL"]).to(device)

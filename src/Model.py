@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss, normalize
+from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss, normalize, relu6, adaptive_avg_pool2d
 from itertools import chain
 
 class MLP(nn.Module):
@@ -84,14 +84,122 @@ class Encoder(nn.Module):
         x = self.dropout(max_pool2d(x, 2))
         return torch.flatten(x, 1)
 
+class MobileNetV2Block(nn.Module):
+    def __init__(self, inputChannels, outputChannels, expansionFactor=6, downSample=False):
+        super(MobileNetV2Block, self).__init__()
+
+        self.downSample = downSample
+        self.shortcut = (not downSample) and (inputChannels == outputChannels)
+
+        internalChannels = inputChannels * expansionFactor
+
+        self.conv1 = nn.Conv2d(inputChannels, internalChannels, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(internalChannels)
+        self.conv2 = nn.Conv2d(internalChannels, internalChannels, 3, stride=2 if downSample else 1, groups=internalChannels, bias=False, padding=1)
+        self.bn2 = nn.BatchNorm2d(internalChannels)
+        self.conv3 = nn.Conv2d(internalChannels, outputChannels, 1, bias=False)
+        self.bn3 = nn.BatchNorm2d(outputChannels)
+
+    def forward(self, x):
+        y = relu6(self.bn1(self.conv1(x)))
+        y = relu6(self.bn2(self.conv2(y)))
+        y = self.bn3(self.conv3(y))
+
+        if self.shortcut:
+            return y + x
+        else:
+            return y
+
+class MobileNetV2(nn.Module):
+    def __init__(self, imageDims, imageChannels):
+        super(MobileNetV2, self).__init__()
+
+        self.conv0 = nn.Conv2d(imageChannels, 32, 3, padding=1, bias=False)
+        self.bn0 = nn.BatchNorm2d(32)
+
+        self.blocks = nn.Sequential(
+            MobileNetV2Block(32, 16, expansionFactor=1, downSample=False),
+            MobileNetV2Block(16, 24, downSample=False),
+            MobileNetV2Block(24, 24),
+            MobileNetV2Block(24, 32, downSample=False),
+            MobileNetV2Block(32, 32),
+            MobileNetV2Block(32, 32),
+            MobileNetV2Block(32, 64, downSample=True),
+            MobileNetV2Block(64, 64),
+            MobileNetV2Block(64, 64),
+            MobileNetV2Block(64, 64),
+            MobileNetV2Block(64, 96, downSample=False),
+            MobileNetV2Block(96, 96),
+            MobileNetV2Block(96, 96),
+            MobileNetV2Block(96, 160, downSample=True),
+            MobileNetV2Block(160, 160),
+            MobileNetV2Block(160, 160),
+            MobileNetV2Block(160, 320, downSample=False))
+
+        # last conv layers and fc layer
+        self.conv1 = nn.Conv2d(320, 1280, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(1280)
+
+    def getOutputSize(self):
+        return 1280
+
+    def forward(self, x):
+        y = relu6(self.bn0(self.conv0(x)))
+        y = self.blocks(y)
+        y = relu6(self.bn1(self.conv1(y)))
+        y = adaptive_avg_pool2d(y, 1)
+        y = torch.squeeze(torch.squeeze(y, -1), -1)
+        return y
+
+class MobileNetV2Short(nn.Module):
+    def __init__(self, imageDims, imageChannels):
+        super(MobileNetV2Short, self).__init__()
+
+        self.conv0 = nn.Conv2d(imageChannels, 32, 3, padding=1, bias=False)
+        self.bn0 = nn.BatchNorm2d(32)
+
+        self.blocks = nn.Sequential(
+            MobileNetV2Block(32, 16, expansionFactor=1, downSample=False),
+            MobileNetV2Block(16, 24, downSample=False),
+            #MobileNetV2Block(24, 24),
+            MobileNetV2Block(24, 32, downSample=False),
+            #MobileNetV2Block(32, 32),
+            #MobileNetV2Block(32, 32),
+            MobileNetV2Block(32, 64, downSample=True),
+            #MobileNetV2Block(64, 64),
+            #MobileNetV2Block(64, 64),
+            #MobileNetV2Block(64, 64),
+            MobileNetV2Block(64, 96, downSample=False),
+            #MobileNetV2Block(96, 96),
+            #MobileNetV2Block(96, 96),
+            MobileNetV2Block(96, 160, downSample=True),
+            #MobileNetV2Block(160, 160),
+            #MobileNetV2Block(160, 160),
+            MobileNetV2Block(160, 320, downSample=False))
+
+        # last conv layers and fc layer
+        self.conv1 = nn.Conv2d(320, 1280, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(1280)
+
+    def getOutputSize(self):
+        return 1280
+
+    def forward(self, x):
+        y = relu6(self.bn0(self.conv0(x)))
+        y = self.blocks(y)
+        y = relu6(self.bn1(self.conv1(y)))
+        y = adaptive_avg_pool2d(y, 1)
+        y = torch.squeeze(torch.squeeze(y, -1), -1)
+        return y
+
 class BYOL(nn.Module):
-    def __init__(self, initialTau, predictor, projector, encoder, batchNorm):
+    def __init__(self, initialTau, encoderName, predictor, projector, encoder, batchNorm):
         super(BYOL, self).__init__()
 
         self.tau = initialTau
 
-        self.onlineEncoder = Encoder(**encoder)
-        self.targetEncoder = Encoder(**encoder)
+        self.onlineEncoder = globals()[encoderName](**encoder)
+        self.targetEncoder = globals()[encoderName](**encoder)
         self.onlineProjector = MLP(inputSize=self.onlineEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
         self.targetProjector = MLP(inputSize=self.targetEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
         self.predictor = MLP(inputSize=self.onlineProjector.getOutputSize(), outputSize=self.targetProjector.getOutputSize(), batchNorm=batchNorm, **predictor)

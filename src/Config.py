@@ -27,6 +27,7 @@ def GetConfig():
             batchNorm=None #autoset
         ),
         BYOL=dict(
+            encoderName="MobileNetV2Short",
             projector=dict(
                 hiddenSize=32,
                 outputSize=10,
@@ -43,7 +44,7 @@ def GetConfig():
         optimizer=dict(
             name="Adam",
             settings=dict(
-                lr=0.0001
+                lr=0.0003
             )
         ),
         batchNorm=dict(
@@ -64,7 +65,7 @@ def GetConfig():
             epochStreamCount=16,
         ),
         client=dict(
-            serverSyncEveryNEpochs=1,
+            serverSyncEveryNEpochs=100,
             updateBufferEveryNEpochs=1
         ),
         server=dict(

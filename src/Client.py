@@ -8,6 +8,7 @@ import Config
 import Model
 import ImageAugmenter
 import Communication
+import Util
 
 class DataSource:
 
@@ -234,7 +235,7 @@ def main():
     config = Config.GetConfig()
 
     #torch.manual_seed(0)
-    device = torch.device(config["device"])
+    device = Util.GetDeviceFromConfig(config)
 
     #dataSource = DatasetDataSource(config)
     dataSource = DataBufferDataSource(config)
