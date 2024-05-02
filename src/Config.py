@@ -18,7 +18,7 @@ def GetConfig():
             datasetName="CIFAR10",
             normalization=None, #autoset
             batchSize=32,
-            classificationSplit=0.01,
+            classificationSplit=0.1,
         ),
         EMA=dict(
             initialTau=0.99
@@ -29,8 +29,8 @@ def GetConfig():
         BYOL=dict(
             encoderName="MobileNetV2Short",
             projector=dict(
-                hiddenSize=32,
-                outputSize=10,
+                hiddenSize=128,
+                outputSize=32,
             ),
             predictor=dict(
                 hiddenSize=32
@@ -42,12 +42,21 @@ def GetConfig():
             batchNorm=None #autoset
         ),
         optimizer=dict(
-            name="Adam",
+            name="AdamW",
             settings=dict(
-                lr=0.0003
+                lr=0.0003,
+                weight_decay=0.01
             )
         ),
-        batchNorm=dict(
+        #optimizer=dict(
+        #    name="SGD",
+        #    settings=dict(
+        #        lr=0.01,
+        #        weight_decay=4e-5,
+        #        momentum=0.9
+        #    )
+        #),
+        batchNorm=dict( # Todo: batchnorm config is not implemented in MobileNetV2
             eps=1e-5,
             momentum=0.1
         ),
