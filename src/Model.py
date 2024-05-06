@@ -28,11 +28,13 @@ class MLP(nn.Module):
         return self.hiddenSize
 
 class Classifier(nn.Module):
-    def __init__(self, classCount, encoder, encoderName, batchNorm):
+    def __init__(self, classCount, hiddenSize, encoder, encoderName, batchNorm):
         super(Classifier, self).__init__()
 
         self.encoder = globals()[encoderName](**encoder)
-        self.fc = nn.Linear(self.encoder.getOutputSize(), classCount)
+        self.fc1 = nn.Linear(self.encoder.getOutputSize(), hiddenSize)
+        self.bn1 = nn.BatchNorm1d(hiddenSize, **batchNorm)
+        self.fc2 = nn.Linear(hiddenSize, classCount)
 
         for param in self.encoder.parameters():
             param.requires_grad = False
@@ -41,7 +43,7 @@ class Classifier(nn.Module):
         with torch.no_grad():
             encoded = self.encoder(x).detach()
 
-        return log_softmax(self.fc(encoded), dim=1)
+        return log_softmax(self.fc2(relu(self.bn1(self.fc1(encoded)))), dim=1)
 
     def loss(self, x, target):
         return nll_loss(self(x), target)
@@ -62,7 +64,12 @@ class Classifier(nn.Module):
             classifierParam.data = onlineParam.data
 
     def trainableParameters(self):
-        return self.fc.parameters() # Todo: what if we add an another layer? Automate
+        return chain(
+            self.fc1.parameters(),
+            self.bn1.parameters(),
+            self.fc2.parameters()
+        )
+        #return self.fc.parameters() # Todo: what if we add an another layer? Automate
 
 class Encoder(nn.Module):
     def __init__(self, imageDims, imageChannels, outputChannels=64, hiddenChannels=32, kernelSize=3):
@@ -261,3 +268,6 @@ class BYOL(nn.Module):
 
     def onlineEncoderParameters(self):
         return self.onlineEncoder.parameters()
+
+    def predictorParameters(self):
+        return self.predictor.parameters()

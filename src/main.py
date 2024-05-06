@@ -17,8 +17,9 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
 
     maxTrainBatches = dataset.trainBatchCount() / dataset.batchSize
     for batchIndex, (data, target) in enumerate(dataset.trainingEnumeration()):
+        #data = data.to(device)
         dataView1, dataView2 = augmenter.createImagePairBatchSingleAugment(data)
-        dataView1, dataView2, target = dataView1.to(device), dataView2.to(device), target.to(device)
+        dataView1, dataView2 = dataView1.to(device), dataView2.to(device)
 
         optimizer.zero_grad()
         loss = byol(dataView1, dataView2)

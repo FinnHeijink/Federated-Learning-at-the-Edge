@@ -21,9 +21,10 @@ def GetConfig():
             classificationSplit=0.1,
         ),
         EMA=dict(
-            initialTau=0.99
+            initialTau=0.90
         ),
         classifier=dict(
+            hiddenSize=128,
             batchNorm=None #autoset
         ),
         BYOL=dict(
@@ -33,7 +34,7 @@ def GetConfig():
                 outputSize=32,
             ),
             predictor=dict(
-                hiddenSize=32
+                hiddenSize=128
             ),
             encoder=dict(
                 imageDims=(0, 0), #autoset
@@ -45,7 +46,7 @@ def GetConfig():
             name="AdamW",
             settings=dict(
                 lr=0.0003,
-                weight_decay=0.01
+                weight_decay=0.0001
             )
         ),
         #optimizer=dict(
