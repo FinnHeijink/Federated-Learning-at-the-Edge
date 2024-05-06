@@ -1,5 +1,5 @@
 import torch
-import torchvision.transforms as transforms
+import torchvision.transforms.v2 as transforms
 
 
 class ImageAugmenter:
@@ -13,8 +13,10 @@ class ImageAugmenter:
         if applyColorAugments:
             self.transform = transforms.Compose([
                 self.transform,
-                transforms.ColorJitter(0.8, 0.8, 0.8, 0.2),
-                transforms.RandomGrayscale(p=0.2)
+                transforms.ColorJitter(0.4, 0.4, 0.2, 0.1),
+                transforms.RandomGrayscale(p=0.2),
+                transforms.GaussianBlur(9, sigma=(0.1, 0.2)),
+                transforms.RandomSolarize(threshold=0.5, p=0.2)
             ])
 
         if applyFlips:

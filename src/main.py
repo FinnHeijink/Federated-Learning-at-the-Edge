@@ -17,9 +17,9 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
 
     maxTrainBatches = dataset.trainBatchCount() / dataset.batchSize
     for batchIndex, (data, target) in enumerate(dataset.trainingEnumeration()):
-        #data = data.to(device)
+        data = data.to(device)
         dataView1, dataView2 = augmenter.createImagePairBatchSingleAugment(data)
-        dataView1, dataView2 = dataView1.to(device), dataView2.to(device)
+        #dataView1, dataView2 = dataView1.to(device), dataView2.to(device)
 
         optimizer.zero_grad()
         loss = byol(dataView1, dataView2)
@@ -32,6 +32,8 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
         # Todo: let the checkpointer or so show this, or at least allow for configuration
         if batchIndex % 10 == 0:
             print(f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxTrainBatches * 100:.1f}%: BYOLLoss={loss:.4f}")
+
+    torch.save(byol.state_dict(), "src/checkpoints/Model.pt")
 
 def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, epoch, maxEpochs):
     classifier.train()
@@ -50,6 +52,9 @@ def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, e
         if batchIndex % 1 == 0:
             print(
                 f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxClassifierBatches * 100:.1f}%: classificationLoss={loss:.2f}")
+
+    torch.save(classifier.state_dict(), "src/checkpoints/Classifier.pt")
+
 
 def TestEpoch(classifier, device, dataset):
     classifier.eval() # Disable dropout
@@ -83,6 +88,9 @@ def main():
     byol = Model.BYOL(**config["EMA"], **config["BYOL"]).to(device)
     classifier = Model.Classifier(**config["classifier"]).to(device)
     checkpointer = Checkpointer.Checkpointer(**config["checkpointer"])
+
+    byol.load_state_dict(torch.load("src/checkpoints/Model2.pt"))
+    classifier.load_state_dict(torch.load("src/checkpoints/Classifier2.pt"))
 
     # Todo: scheduler
 
