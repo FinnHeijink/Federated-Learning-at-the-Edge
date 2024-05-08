@@ -3,6 +3,9 @@ import Checkpointer
 def GetConfig():
     config = dict(
         device="cuda",
+        mode="pretrain",
+        loadFromCheckpoint=True,
+        printStatistics=True,
 
         augmenter=dict(
             imageDims=(0, 0), #autoset
@@ -65,7 +68,8 @@ def GetConfig():
             directory="src/checkpoints",
             #checkpointMode=Checkpointer.CheckpointMode.EVERY_N_SECS,
             checkpointMode=Checkpointer.CheckpointMode.EVERY_EPOCH,
-            checkPointEveryNSecs=30
+            checkPointEveryNSecs=30,
+            saveOptimizerData=True
         ),
         dataBuffer=dict(
             datasetLoadBatchSize=16,

@@ -1,6 +1,9 @@
 import os.path as path
-from enum import Enum
 import time
+import datetime
+import glob
+import os
+from enum import Enum
 
 import torch
 
@@ -13,7 +16,7 @@ class CheckpointMode(Enum):
 
 class Checkpointer:
 
-    def __init__(self, directory, checkpointMode, saveOptimizerData=False, checkPointEveryNSecs=0, checkPointEveryNBatches=0):
+    def __init__(self, directory, checkpointMode, saveOptimizerData=False, checkPointEveryNSecs=0, checkPointEveryNBatches=0, prefix=""):
         self.directory = directory
         self.mode = checkpointMode
         self.saveOptimizerData = saveOptimizerData
@@ -24,11 +27,14 @@ class Checkpointer:
         self.lastBatch = -1
         self.lastCheckpointTime = -1
 
+        self.prefix = prefix
+        self.runIdentifier = datetime.datetime.now().strftime("%H%M%S")
+
     def getModelCheckpointPath(self):
-        return path.join(self.directory, "Model.pt")
+        return path.join(self.directory, self.prefix + "Model_" + self.runIdentifier + "_" + str(self.lastEpoch) + ".pt")
 
     def getOptimizerCheckpointPath(self):
-        return path.join(self.directory, "Optimizer.pt")
+        return path.join(self.directory, self.prefix + "Optimizer_" + self.runIdentifier + "_" + str(self.lastEpoch) + ".pt")
 
     def update(self, model, optimizer, currentEpoch, maxEpochs, currentBatch, maxBatches):
         currentTime = time.time()
@@ -53,8 +59,28 @@ class Checkpointer:
         else:
             raise NotImplementedError
 
-    def loadLastCheckpoint(self, byol, classifier, byolOptimizer, classifierOptimizer):
-        pass
+        self.lastEpoch = currentEpoch
+
+    def loadLastCheckpoint(self, model, optimizer):
+        listOfFiles = glob.glob(self.directory + "/*")
+        latestFile = max(listOfFiles, key=lambda f: os.path.getctime(f) if f.split("\\")[-1].startswith(self.prefix) else 0).split("\\")[-1]
+
+        if not latestFile.startswith(self.prefix):
+            print(f"No {self.prefix} checkpoint found")
+            return
+
+        postfix = "_".join(latestFile.split("_")[1:])
+
+        print(f"Loading {self.prefix} checkpoint: {postfix}")
+
+        modelPath = self.prefix + "Model_" + postfix
+        if os.path.exists(modelPath):
+            model.load_state_dict(torch.load(modelPath))
+
+        if optimizer and self.saveOptimizerData:
+            optimizerPath = self.prefix + "Optimizer_" + postfix
+            if os.path.exists(optimizerPath):
+                optimizer.load_state_dict(torch.load(optimizerPath))
 
     def saveCheckpoint(self, model, optimizer):
         torch.save(model.state_dict(), self.getModelCheckpointPath())

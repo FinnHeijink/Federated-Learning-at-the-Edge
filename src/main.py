@@ -1,6 +1,9 @@
 import torch
 import torch.optim as optim
 
+import argparse
+import numpy as np
+
 import Checkpointer
 import Model
 import Config
@@ -18,7 +21,7 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
     maxTrainBatches = dataset.trainBatchCount() / dataset.batchSize
     for batchIndex, (data, target) in enumerate(dataset.trainingEnumeration()):
         data = data.to(device)
-        dataView1, dataView2 = augmenter.createImagePairBatchSingleAugment(data)
+        dataView1, dataView2 = augmenter.createImagePairBatch(data)
         #dataView1, dataView2 = dataView1.to(device), dataView2.to(device)
 
         optimizer.zero_grad()
@@ -27,13 +30,13 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
         optimizer.step()
         byol.stepEMA()
 
-        # checkpointer.update(byol, optimizer, epoch, maxEpochs, batchIndex, maxTrainBatches)
+        checkpointer.update(byol, optimizer, epoch, maxEpochs, batchIndex, maxTrainBatches)
 
         # Todo: let the checkpointer or so show this, or at least allow for configuration
         if batchIndex % 10 == 0:
             print(f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxTrainBatches * 100:.1f}%: BYOLLoss={loss:.4f}")
 
-    torch.save(byol.state_dict(), "src/checkpoints/Model.pt")
+    torch.save(byol.state_dict(), "src/checkpoints/ModelLong.pt")
 
 def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, epoch, maxEpochs):
     classifier.train()
@@ -49,11 +52,11 @@ def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, e
         loss.backward()
         optimizer.step()
 
-        if batchIndex % 1 == 0:
+        checkpointer.update(classifier, optimizer, epoch, maxEpochs, batchIndex, maxClassifierBatches)
+
+        if batchIndex % 10 == 0:
             print(
                 f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxClassifierBatches * 100:.1f}%: classificationLoss={loss:.2f}")
-
-    torch.save(classifier.state_dict(), "src/checkpoints/Classifier.pt")
 
 
 def TestEpoch(classifier, device, dataset):
@@ -76,10 +79,35 @@ def TestEpoch(classifier, device, dataset):
 
     print(f"Evaluation: loss={testLoss:2f}, accuracy={accuracy * 100:.1f}%")
 
-def main():
-    mode = "pretrain" # Todo: get from cmdline args
+    return testLoss, accuracy
 
+def ParseArgs(config):
+    parser = argparse.ArgumentParser()
+
+    def PopulateDict(prefix, dictionary):
+        for key, value in dictionary.items():
+            if isinstance(value, dict):
+                PopulateDict(prefix + key + ".", value)
+            else:
+                parser.add_argument("--" + prefix + key, required=False, type=type(value))
+
+    PopulateDict("", config)
+    result = parser.parse_args()
+
+    def RetrieveDict(prefix, dictionary):
+        for key, value in dictionary.items():
+            if isinstance(value, dict):
+                RetrieveDict(prefix + key + ".", value)
+            else:
+                resultValue = getattr(result, prefix + key)
+                if not (resultValue is None):
+                    dictionary[key] = resultValue
+
+    RetrieveDict("", config)
+
+def main():
     config = Config.GetConfig()
+    ParseArgs(config)
 
     torch.manual_seed(0)
     device = Util.GetDeviceFromConfig(config)
@@ -87,28 +115,42 @@ def main():
     dataset = Dataset.Dataset(**config["dataset"])
     byol = Model.BYOL(**config["EMA"], **config["BYOL"]).to(device)
     classifier = Model.Classifier(**config["classifier"]).to(device)
-    checkpointer = Checkpointer.Checkpointer(**config["checkpointer"])
-
-    byol.load_state_dict(torch.load("src/checkpoints/Model2.pt"))
-    classifier.load_state_dict(torch.load("src/checkpoints/Classifier2.pt"))
+    byolCheckpointer = Checkpointer.Checkpointer(**config["checkpointer"], prefix="BYOL")
+    classifierCheckpointer = Checkpointer.Checkpointer(**config["checkpointer"], prefix="Classifier")
 
     # Todo: scheduler
 
-    if mode == "pretrain":
+    if config["mode"] == "pretrain":
         byolOptimizer = getattr(optim, config["optimizer"]["name"])(byol.trainableParameters(), **config["optimizer"]["settings"])
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
 
-        # checkpointer.loadLastCheckpoint(byol, classifier, byolOptimizer, classifierOptimizer)
+        if config["loadFromCheckpoint"]:
+            byolCheckpointer.loadLastCheckpoint(byol, byolOptimizer)
+            classifierCheckpointer.loadLastCheckpoint(classifier, classifierOptimizer)
+
         augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
-        for epoch in range(0, config["training"]["epochs"]):
-            TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, checkpointer, epoch, config["training"]["epochs"])
-            classifier.copyEncoderFromBYOL(byol)
-            TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, checkpointer, epoch, config["training"]["epochs"])
-            if config["training"]["evaluateEveryEpoch"]:
-                TestEpoch(classifier, device, dataset)
-    elif mode == "eval":
-        checkpointer.loadLastCheckpoint(byol, classifier, None, None)
+        statistics = []
+
+        try:
+            for epoch in range(0, config["training"]["epochs"]):
+                TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, byolCheckpointer, epoch, config["training"]["epochs"])
+                classifier.copyEncoderFromBYOL(byol)
+                TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["epochs"])
+                if config["training"]["evaluateEveryEpoch"]:
+                    testResults = TestEpoch(classifier, device, dataset)
+                    statistics.append(testResults)
+        except KeyboardInterrupt:
+            pass
+
+        if len(statistics) and config["printStatistics"]:
+            print("Statistics:", np.array(statistics))
+            Util.PlotStatistics(statistics)
+
+    elif config["mode"] == "eval":
+        if config["loadFromCheckpoint"]:
+            classifierCheckpointer.loadLastCheckpoint(classifier, None)
+
         classifier.copyEncoderFromBYOL(byol)
         TestEpoch(classifier, device, dataset)
     else:
