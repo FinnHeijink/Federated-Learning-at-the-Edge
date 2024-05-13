@@ -133,6 +133,8 @@ def main():
 
     # Todo: scheduler
 
+    print(config["mode"])
+
     if config["mode"] == "pretrain":
         byolOptimizer = getattr(optim, config["optimizer"]["name"])(byol.trainableParameters(), **config["optimizer"]["settings"])
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
@@ -158,8 +160,11 @@ def main():
         except KeyboardInterrupt:
             pass
 
-        if len(statistics) and config["printStatistics"]:
-            Util.PlotStatistics(statistics)
+        if len(statistics):
+            if config["printStatistics"]:
+                Util.PlotStatistics(statistics)
+
+            print("Final accuracy:", statistics[-1][1])
 
     elif config["mode"] == "eval":
         if config["loadFromCheckpoint"]:
@@ -186,8 +191,11 @@ def main():
         except KeyboardInterrupt:
             pass
 
-        if len(statistics) and config["printStatistics"]:
-            Util.PlotStatistics(statistics)
+        if len(statistics):
+            if config["printStatistics"]:
+                Util.PlotStatistics(statistics)
+
+            print("Final accuracy:", statistics[-1][1])
     else:
         raise NotImplementedError
 
