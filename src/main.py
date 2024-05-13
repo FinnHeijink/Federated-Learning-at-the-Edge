@@ -84,12 +84,25 @@ def TestEpoch(classifier, device, dataset):
 def ParseArgs(config):
     parser = argparse.ArgumentParser()
 
+    # From: https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+    def t_or_f(arg):
+        ua = str(arg).upper()
+        if 'TRUE'.startswith(ua):
+            return True
+        elif 'FALSE'.startswith(ua):
+            return False
+        else:
+            pass  # error condition maybe?
+
     def PopulateDict(prefix, dictionary):
         for key, value in dictionary.items():
             if isinstance(value, dict):
                 PopulateDict(prefix + key + ".", value)
             else:
-                parser.add_argument("--" + prefix + key, required=False, type=type(value))
+                if type(value) == bool:
+                    parser.add_argument("--" + prefix + key, required=False, type=t_or_f)
+                else:
+                    parser.add_argument("--" + prefix + key, required=False, type=type(value))
 
     PopulateDict("", config)
     result = parser.parse_args()
@@ -125,8 +138,8 @@ def main():
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
 
         if config["loadFromCheckpoint"]:
-            byolCheckpointer.loadLastCheckpoint(byol, byolOptimizer)
-            classifierCheckpointer.loadLastCheckpoint(classifier, classifierOptimizer)
+            byolCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], byol, byolOptimizer)
+            classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
 
         augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
@@ -136,23 +149,45 @@ def main():
             for epoch in range(0, config["training"]["epochs"]):
                 TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, byolCheckpointer, epoch, config["training"]["epochs"])
                 classifier.copyEncoderFromBYOL(byol)
-                TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["epochs"])
-                if config["training"]["evaluateEveryEpoch"]:
+                for i in range(config["training"]["classifierEpochs"]):
+                    TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["epochs"])
+
+                if epoch % config["training"]["evaluateEveryNEpochs"] == 0:
                     testResults = TestEpoch(classifier, device, dataset)
-                    statistics.append(testResults)
+                    statistics.append((*testResults, epoch))
         except KeyboardInterrupt:
             pass
 
         if len(statistics) and config["printStatistics"]:
-            print("Statistics:", np.array(statistics))
             Util.PlotStatistics(statistics)
 
     elif config["mode"] == "eval":
         if config["loadFromCheckpoint"]:
-            classifierCheckpointer.loadLastCheckpoint(classifier, None)
+            classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, None)
 
         classifier.copyEncoderFromBYOL(byol)
         TestEpoch(classifier, device, dataset)
+    elif config["mode"] == "evaltrain":
+        classifier.copyEncoderFromBYOL(byol)
+        classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
+
+        if config["loadFromCheckpoint"]:
+            classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
+
+        statistics = []
+
+        try:
+            for epoch in range(config["training"]["classifierEpochs"]):
+                TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["classifierEpochs"])
+
+                if epoch % config["training"]["evaluateEveryNEpochs"] == 0:
+                    testResults = TestEpoch(classifier, device, dataset)
+                    statistics.append((*testResults, epoch))
+        except KeyboardInterrupt:
+            pass
+
+        if len(statistics) and config["printStatistics"]:
+            Util.PlotStatistics(statistics)
     else:
         raise NotImplementedError
 

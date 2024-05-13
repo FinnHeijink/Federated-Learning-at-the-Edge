@@ -5,6 +5,7 @@ def GetConfig():
         device="cuda",
         mode="pretrain",
         loadFromCheckpoint=True,
+        loadFromSpecificCheckpoint=None,
         printStatistics=True,
 
         augmenter=dict(
@@ -15,7 +16,8 @@ def GetConfig():
 
         training=dict(
             epochs=4000,
-            evaluateEveryEpoch=True,
+            evaluateEveryNEpochs=1,
+            classifierEpochs=1,
         ),
         dataset=dict(
             datasetName="CIFAR10",
@@ -92,6 +94,9 @@ def GetConfig():
     config["classifier"]["encoder"] = config["BYOL"]["encoder"]
     config["classifier"]["encoderName"] = config["BYOL"]["encoderName"]
     config["dataBuffer"]["batchSize"] = config["dataset"]["batchSize"]
+
+    if config["EMA"]["initialTau"] > 0.01: # Tau=0 means EMA disabled, so don't scale it.
+        config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (32 / config["dataset"]["batchSize"])
 
     if config["dataset"]["datasetName"] == "MNIST":
         config["augmenter"]["imageDims"] = (28, 28)

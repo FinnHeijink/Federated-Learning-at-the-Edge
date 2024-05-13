@@ -28,7 +28,7 @@ class Checkpointer:
         self.lastCheckpointTime = -1
 
         self.prefix = prefix
-        self.runIdentifier = datetime.datetime.now().strftime("%H%M%S")
+        self.runIdentifier = datetime.datetime.now().strftime("%d%m%y_%H%M%S")
 
     def getModelCheckpointPath(self):
         return path.join(self.directory, self.prefix + "Model_" + self.runIdentifier + "_" + str(self.lastEpoch) + ".pt")
@@ -71,6 +71,9 @@ class Checkpointer:
 
         postfix = "_".join(latestFile.split("_")[1:])
 
+        self.loadCheckpointFromPostfix(postfix, model, optimizer)
+
+    def loadCheckpointFromPostfix(self, postfix, model, optimizer):
         print(f"Loading {self.prefix} checkpoint: {postfix}")
 
         modelPath = self.prefix + "Model_" + postfix
@@ -81,6 +84,12 @@ class Checkpointer:
             optimizerPath = self.prefix + "Optimizer_" + postfix
             if os.path.exists(optimizerPath):
                 optimizer.load_state_dict(torch.load(optimizerPath))
+
+    def loadCheckpoint(self, specificCheckpoint, model, optimizer):
+        if specificCheckpoint == None:
+            self.loadLastCheckpoint(model, optimizer)
+        else:
+            self.loadCheckpointFromPostfix(specificCheckpoint, model, optimizer)
 
     def saveCheckpoint(self, model, optimizer):
         torch.save(model.state_dict(), self.getModelCheckpointPath())

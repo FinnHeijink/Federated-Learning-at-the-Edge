@@ -8,10 +8,12 @@ def PlotImage(image):
 
 def PlotStatistics(statistics):
     statistics = np.array(statistics)
+
+    print("Statistics:", statistics)
+
     loss = statistics[:,0]
     accuracy = statistics[:,1]
-
-    epochs = np.arange(0, len(loss))
+    epochs = statistics[:,2]
 
     plt.plot(epochs, loss, label="Loss")
     plt.plot(epochs, accuracy, label="Accuracy")
