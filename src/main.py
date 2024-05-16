@@ -11,8 +11,6 @@ import Dataset
 import ImageAugmenter
 import Util
 
-# Todo: implement CheckPointer & BYOL+Classifier splitted saving
-
 def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, epoch, maxEpochs):
     byol.train()  # Enables dropout
 
@@ -133,15 +131,16 @@ def main():
 
     # Todo: scheduler
 
-    print(config["mode"])
-
     if config["mode"] == "pretrain":
         byolOptimizer = getattr(optim, config["optimizer"]["name"])(byol.trainableParameters(), **config["optimizer"]["settings"])
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
 
+        startEpoch = 0
         if config["loadFromCheckpoint"]:
             byolCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], byol, byolOptimizer)
             classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
+
+        lrScheduler = optim.lr_scheduler.CosineAnnealingLR(byolOptimizer, config["training"]["epochs"])
 
         augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
@@ -170,10 +169,8 @@ def main():
         if config["loadFromCheckpoint"]:
             classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, None)
 
-        classifier.copyEncoderFromBYOL(byol)
         TestEpoch(classifier, device, dataset)
     elif config["mode"] == "evaltrain":
-        classifier.copyEncoderFromBYOL(byol)
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
 
         if config["loadFromCheckpoint"]:

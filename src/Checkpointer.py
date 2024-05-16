@@ -76,12 +76,12 @@ class Checkpointer:
     def loadCheckpointFromPostfix(self, postfix, model, optimizer):
         print(f"Loading {self.prefix} checkpoint: {postfix}")
 
-        modelPath = self.prefix + "Model_" + postfix
+        modelPath = path.join(self.directory, self.prefix + "Model_" + postfix)
         if os.path.exists(modelPath):
             model.load_state_dict(torch.load(modelPath))
 
         if optimizer and self.saveOptimizerData:
-            optimizerPath = self.prefix + "Optimizer_" + postfix
+            optimizerPath = path.join(self.directory, self.prefix + "Optimizer_" + postfix)
             if os.path.exists(optimizerPath):
                 optimizer.load_state_dict(torch.load(optimizerPath))
 

@@ -3,10 +3,11 @@ import skopt.space as space
 import subprocess
 
 searchSpace = list()
-searchSpace.append(space.Real(1e-5, 1e-3, "log-uniform", name="--optimizer.settings.lr"))
+searchSpace.append(space.Real(1e-6, 1e-2, "log-uniform", name="--optimizer.settings.weight_decay"))
 searchSpace.append(space.Real(0.5, 0.99, "log-uniform", name="--EMA.initialTau"))
-searchSpace.append(space.Integer(32, 512, name="--BYOL.projector.hiddenSize"))
-#searchSpace.append(space.Categorical(["Encoder", "MobileNetV2Short", "MobileNetV2"], name="--BYOL.encoderName"))
+searchSpace.append(space.Integer(32, 512, "log-uniform", name="--BYOL.projector.hiddenSize"))
+searchSpace.append(space.Integer(16, 256, "log-uniform", name="--dataset.batchSize"))
+searchSpace.append(space.Categorical(["Encoder", "MobileNetV2Short", "MobileNetV2"], name="--BYOL.encoderName"))
 
 @skopt.utils.use_named_args(searchSpace)
 def evaluateModel(**params):
