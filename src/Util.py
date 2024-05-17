@@ -33,8 +33,7 @@ def GetDeviceFromConfig(config):
         return torch.device("cpu")
 
 class WarmupCosineScheduler(torch.optim.lr_scheduler.LRScheduler):
-    def __init__(self, optimizer, batchSize, startEpoch, epochCount, warmupEpochs, baseLearningRate):
-        self.batchSize = batchSize
+    def __init__(self, optimizer, startEpoch, epochCount, warmupEpochs, baseLearningRate):
         self.baseLearningRate = baseLearningRate
         self.epochCount = epochCount
         self.warmupEpochs = warmupEpochs
@@ -45,17 +44,15 @@ class WarmupCosineScheduler(torch.optim.lr_scheduler.LRScheduler):
             self.step()
 
     def get_lr(self):
-        scaledLR = self.baseLearningRate * self.batchSize / 32
-
         afterWarmupEpoch = self._step_count - self.warmupEpochs
         nonWarmupEpochCount = self.epochCount - self.warmupEpochs
 
         if self._step_count < self.warmupEpochs:
-            return [scaledLR * self._step_count / self.warmupEpochs] # Linear warm-up
+            return [self.baseLearningRate * self._step_count / self.warmupEpochs] # Linear warm-up
         elif self._step_count < self.epochCount:
-            return [scaledLR * 0.5 * (1 + math.cos(math.pi * afterWarmupEpoch / nonWarmupEpochCount))]
+            return [self.baseLearningRate * 0.5 * (1 + math.cos(math.pi * afterWarmupEpoch / nonWarmupEpochCount))]
         else:
-            return [scaledLR]
+            return [self.baseLearningRate]
 
 class EMAScheduler:
     def __init__(self, initialTau, epochCount, enableSchedule):
