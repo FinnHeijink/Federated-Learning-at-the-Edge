@@ -71,7 +71,7 @@ class Checkpointer:
 
         postfix = "_".join(latestFile.split("_")[1:])
 
-        self.loadCheckpointFromPostfix(postfix, model, optimizer)
+        return self.loadCheckpointFromPostfix(postfix, model, optimizer)
 
     def loadCheckpointFromPostfix(self, postfix, model, optimizer):
         print(f"Loading {self.prefix} checkpoint: {postfix}")
@@ -85,11 +85,13 @@ class Checkpointer:
             if os.path.exists(optimizerPath):
                 optimizer.load_state_dict(torch.load(optimizerPath))
 
+        return int(postfix.split("_")[-1].split(".")[0])
+
     def loadCheckpoint(self, specificCheckpoint, model, optimizer):
         if specificCheckpoint == None:
-            self.loadLastCheckpoint(model, optimizer)
+            return self.loadLastCheckpoint(model, optimizer)
         else:
-            self.loadCheckpointFromPostfix(specificCheckpoint, model, optimizer)
+            return self.loadCheckpointFromPostfix(specificCheckpoint, model, optimizer)
 
     def saveCheckpoint(self, model, optimizer):
         torch.save(model.state_dict(), self.getModelCheckpointPath())

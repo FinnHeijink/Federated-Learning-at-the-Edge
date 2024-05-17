@@ -11,7 +11,7 @@ searchSpace.append(space.Categorical(["Encoder", "MobileNetV2Short", "MobileNetV
 
 @skopt.utils.use_named_args(searchSpace)
 def evaluateModel(**params):
-    cmdline = ["src\\RunMainWrapped.bat", "--mode=pretrain", "--loadFromCheckpoint=false", "--printStatistics=false", "--training.epochs=1", "--training.classifierEpochs=5", "--dataset.classificationSplit=0.1", "--training.evaluateEveryNEpochs=1"]
+    cmdline = ["src\\RunMainWrapped.bat", "--mode=pretrain", "--loadFromCheckpoint=false", "--printStatistics=false", "--training.epochs=1", "--training.classifierEpochs=5", "--dataset.classificationSplit=0.1", "--training.evaluateEveryNEpochs=1", "--training.warmupEpochs=0", "--EMA.enableSchedule=False"]
 
     for name, value in params.items():
        cmdline.append(name + "=" + str(value))

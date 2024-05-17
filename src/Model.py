@@ -200,10 +200,10 @@ class MobileNetV2Short(nn.Module):
         return y
 
 class BYOL(nn.Module):
-    def __init__(self, initialTau, encoderName, predictor, projector, encoder, batchNorm):
+    def __init__(self, emaScheduler, encoderName, predictor, projector, encoder, batchNorm):
         super(BYOL, self).__init__()
 
-        self.tau = initialTau
+        self.emaScheduler = emaScheduler
 
         self.onlineEncoder = globals()[encoderName](**encoder)
         self.targetEncoder = globals()[encoderName](**encoder)
@@ -242,8 +242,9 @@ class BYOL(nn.Module):
         return onlineLoss
 
     def stepEMA(self):
+        tau = self.emaScheduler.getTau()
         for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
-            targetParam.data = targetParam.data + (onlineParam.data - targetParam.data) * (1.0 - self.tau)
+            targetParam.data = targetParam.data + (onlineParam.data - targetParam.data) * (1.0 - tau)
 
     def trainableParameters(self):
         return chain(

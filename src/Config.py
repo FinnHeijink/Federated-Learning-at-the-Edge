@@ -16,6 +16,7 @@ def GetConfig():
 
         training=dict(
             epochs=4000,
+            warmupEpochs=10,
             evaluateEveryNEpochs=1,
             classifierEpochs=1,
         ),
@@ -26,7 +27,9 @@ def GetConfig():
             classificationSplit=0.1,
         ),
         EMA=dict(
-            initialTau=0.90
+            initialTau=0.90,
+            epochCount=None, #autoset
+            enableSchedule=True
         ),
         classifier=dict(
             hiddenSize=128,
@@ -47,21 +50,21 @@ def GetConfig():
             ),
             batchNorm=None #autoset
         ),
-        optimizer=dict(
-            name="AdamW",
-            settings=dict(
-                lr=0.0003,
-                weight_decay=0.0001
-            )
-        ),
         #optimizer=dict(
-        #    name="SGD",
+        #    name="AdamW",
         #    settings=dict(
-        #        lr=0.01,
-        #        weight_decay=4e-5,
-        #        momentum=0.9
+        #        lr=0.0003,
+        #        weight_decay=0.0001
         #    )
         #),
+        optimizer=dict(
+            name="SGD",
+            settings=dict(
+                lr=0.01,
+                weight_decay=4e-5,
+                momentum=0.9
+            )
+        ),
         batchNorm=dict( # Todo: batchnorm config is not implemented in MobileNetV2
             eps=1e-5,
             momentum=0.1
@@ -94,6 +97,9 @@ def GetConfig():
     config["classifier"]["encoder"] = config["BYOL"]["encoder"]
     config["classifier"]["encoderName"] = config["BYOL"]["encoderName"]
     config["dataBuffer"]["batchSize"] = config["dataset"]["batchSize"]
+    config["EMA"]["epochCount"] = config["training"]["epochs"]
+
+    config["optimizer"]["settings"]["lr"] = config["optimizer"]["settings"]["lr"] * config["dataset"]["batchSize"] / 32
 
     if config["EMA"]["initialTau"] > 0.01: # Tau=0 means EMA disabled, so don't scale it.
         config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (32 / config["dataset"]["batchSize"])

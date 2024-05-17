@@ -14,7 +14,7 @@ import Util
 def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, epoch, maxEpochs):
     byol.train()  # Enables dropout
 
-    print(f"Training BYOL Epoch {epoch + 1}: lr={optimizer.param_groups[0]['lr']}")
+    print(f"Training BYOL Epoch {epoch + 1}: lr={optimizer.param_groups[0]['lr']}, tau={byol.emaScheduler.getTau()}")
 
     maxTrainBatches = dataset.trainBatchCount() / dataset.batchSize
     for batchIndex, (data, target) in enumerate(dataset.trainingEnumeration()):
@@ -124,7 +124,8 @@ def main():
     device = Util.GetDeviceFromConfig(config)
 
     dataset = Dataset.Dataset(**config["dataset"])
-    byol = Model.BYOL(**config["EMA"], **config["BYOL"]).to(device)
+    emaScheduler = Util.EMAScheduler(**config["EMA"])
+    byol = Model.BYOL(emaScheduler, **config["BYOL"]).to(device)
     classifier = Model.Classifier(**config["classifier"]).to(device)
     byolCheckpointer = Checkpointer.Checkpointer(**config["checkpointer"], prefix="BYOL")
     classifierCheckpointer = Checkpointer.Checkpointer(**config["checkpointer"], prefix="Classifier")
@@ -137,17 +138,17 @@ def main():
 
         startEpoch = 0
         if config["loadFromCheckpoint"]:
-            byolCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], byol, byolOptimizer)
+            startEpoch = byolCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], byol, byolOptimizer)
             classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
 
-        lrScheduler = optim.lr_scheduler.CosineAnnealingLR(byolOptimizer, config["training"]["epochs"])
+        lrScheduler = Util.WarmupCosineScheduler(byolOptimizer, config["dataset"]["batchSize"], startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
 
         augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
         statistics = []
 
         try:
-            for epoch in range(0, config["training"]["epochs"]):
+            for epoch in range(startEpoch, config["training"]["epochs"]):
                 TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, byolCheckpointer, epoch, config["training"]["epochs"])
                 classifier.copyEncoderFromBYOL(byol)
                 for i in range(config["training"]["classifierEpochs"]):
@@ -156,6 +157,10 @@ def main():
                 if epoch % config["training"]["evaluateEveryNEpochs"] == 0:
                     testResults = TestEpoch(classifier, device, dataset)
                     statistics.append((*testResults, epoch))
+
+                lrScheduler.step()
+                classifierOptimizer.param_groups[0]["lr"] = byolOptimizer.param_groups[0]["lr"]
+                emaScheduler.step(epoch)
         except KeyboardInterrupt:
             pass
 
@@ -173,18 +178,23 @@ def main():
     elif config["mode"] == "evaltrain":
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
 
+        startEpoch = 0
         if config["loadFromCheckpoint"]:
-            classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
+            startEpoch = classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
+
+        lrScheduler = Util.WarmupCosineScheduler(classifierOptimizer, config["dataset"]["batchSize"], startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
 
         statistics = []
 
         try:
-            for epoch in range(config["training"]["classifierEpochs"]):
+            for epoch in range(startEpoch, config["training"]["classifierEpochs"]):
                 TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["classifierEpochs"])
 
                 if epoch % config["training"]["evaluateEveryNEpochs"] == 0:
                     testResults = TestEpoch(classifier, device, dataset)
                     statistics.append((*testResults, epoch))
+
+            lrScheduler.step()
         except KeyboardInterrupt:
             pass
 

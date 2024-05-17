@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import math
 
 def PlotImage(image):
-    plt.imshow(np.squeeze(image.detach().cpu().numpy()))
+    plt.imshow(np.squeeze(torch.movedim(image * 0.5 + 0.5, 0, 2).detach().cpu().numpy()))
     plt.show()
 
 def PlotStatistics(statistics):
@@ -30,3 +31,45 @@ def GetDeviceFromConfig(config):
     else:
         print("Using CPU")
         return torch.device("cpu")
+
+class WarmupCosineScheduler(torch.optim.lr_scheduler.LRScheduler):
+    def __init__(self, optimizer, batchSize, startEpoch, epochCount, warmupEpochs, baseLearningRate):
+        self.batchSize = batchSize
+        self.baseLearningRate = baseLearningRate
+        self.epochCount = epochCount
+        self.warmupEpochs = warmupEpochs
+
+        super(WarmupCosineScheduler, self).__init__(optimizer, last_epoch=epochCount)
+
+        for i in range(startEpoch):
+            self.step()
+
+    def get_lr(self):
+        scaledLR = self.baseLearningRate * self.batchSize / 32
+
+        afterWarmupEpoch = self._step_count - self.warmupEpochs
+        nonWarmupEpochCount = self.epochCount - self.warmupEpochs
+
+        if self._step_count < self.warmupEpochs:
+            return [scaledLR * self._step_count / self.warmupEpochs] # Linear warm-up
+        elif self._step_count < self.epochCount:
+            return [scaledLR * 0.5 * (1 + math.cos(math.pi * afterWarmupEpoch / nonWarmupEpochCount))]
+        else:
+            return [scaledLR]
+
+class EMAScheduler:
+    def __init__(self, initialTau, epochCount, enableSchedule):
+        self.initialTau = initialTau
+        self.epochCount = epochCount
+        self.enableSchedule = enableSchedule
+
+        self.tau = self.initialTau
+
+    def step(self, currentEpoch):
+        if not self.enableSchedule:
+            return
+
+        self.tau = 1 - (1 - self.initialTau) * 0.5 * (1 + math.cos(math.pi * currentEpoch / self.epochCount))
+
+    def getTau(self):
+        return self.tau
