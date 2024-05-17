@@ -5,7 +5,6 @@ class Dataset:
 
     def __init__(self, datasetName, batchSize, normalization, classificationSplit):
 
-        # Todo: make generic
         transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(normalization[0], normalization[1])])
 
         self.train = getattr(datasets, datasetName)('datasets', train=True, download=True, transform=transform)

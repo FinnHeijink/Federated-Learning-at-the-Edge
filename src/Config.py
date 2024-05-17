@@ -15,9 +15,9 @@ def GetConfig():
         ),
 
         training=dict(
-            epochs=4000,
+            epochs=75,
             warmupEpochs=10,
-            evaluateEveryNEpochs=1,
+            evaluateEveryNEpochs=5,
             classifierEpochs=1,
         ),
         dataset=dict(
@@ -36,7 +36,7 @@ def GetConfig():
             batchNorm=None #autoset
         ),
         BYOL=dict(
-            encoderName="MobileNetV2Short",
+            encoderName="Encoder",
             projector=dict(
                 hiddenSize=128,
                 outputSize=32,
@@ -65,7 +65,7 @@ def GetConfig():
                 momentum=0.9
             )
         ),
-        batchNorm=dict( # Todo: batchnorm config is not implemented in MobileNetV2
+        batchNorm=dict(
             eps=1e-5,
             momentum=0.1
         ),

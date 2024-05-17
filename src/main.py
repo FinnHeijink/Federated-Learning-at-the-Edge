@@ -130,8 +130,6 @@ def main():
     byolCheckpointer = Checkpointer.Checkpointer(**config["checkpointer"], prefix="BYOL")
     classifierCheckpointer = Checkpointer.Checkpointer(**config["checkpointer"], prefix="Classifier")
 
-    # Todo: scheduler
-
     if config["mode"] == "pretrain":
         byolOptimizer = getattr(optim, config["optimizer"]["name"])(byol.trainableParameters(), **config["optimizer"]["settings"])
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
@@ -175,12 +173,18 @@ def main():
             classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, None)
 
         TestEpoch(classifier, device, dataset)
-    elif config["mode"] == "evaltrain":
+    elif config["mode"] == "evaltrain" or config["mode"] == "evaltrainfrombyol":
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
 
         startEpoch = 0
-        if config["loadFromCheckpoint"]:
-            startEpoch = classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
+
+        if config["mode"] == "evaltrainfrombyol":
+            if config["loadFromCheckpoint"]:
+                startEpoch = byolCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], byol, None)
+            classifier.copyEncoderFromBYOL(byol)
+        else:
+            if config["loadFromCheckpoint"]:
+                startEpoch = classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
 
         lrScheduler = Util.WarmupCosineScheduler(classifierOptimizer, config["dataset"]["batchSize"], startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
 

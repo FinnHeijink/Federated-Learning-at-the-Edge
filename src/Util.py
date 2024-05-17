@@ -38,7 +38,7 @@ class WarmupCosineScheduler(torch.optim.lr_scheduler.LRScheduler):
         self.epochCount = epochCount
         self.warmupEpochs = warmupEpochs
 
-        super(WarmupCosineScheduler, self).__init__(optimizer, last_epoch=epochCount)
+        super(WarmupCosineScheduler, self).__init__(optimizer)
 
         for i in range(startEpoch):
             self.step()
