@@ -141,7 +141,7 @@ def main():
             startEpoch = byolCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], byol, byolOptimizer)
             classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
 
-        lrScheduler = Util.WarmupCosineScheduler(byolOptimizer, config["dataset"]["batchSize"], startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
+        lrScheduler = Util.WarmupCosineScheduler(byolOptimizer, startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
 
         augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
