@@ -1,11 +1,19 @@
 import torch
 from torchvision import datasets, transforms
+import torchvision.transforms.functional as F
+
+class ToHalfTensor(torch.nn.Module):
+    def forward(self, img):
+        return F.to_tensor(img).half()
 
 class Dataset:
 
-    def __init__(self, datasetName, batchSize, normalization, classificationSplit):
+    def __init__(self, datasetName, batchSize, normalization, classificationSplit, useHalfPrecision):
 
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(normalization[0], normalization[1])])
+        transform = transforms.Compose([
+            ToHalfTensor() if useHalfPrecision else transforms.ToTensor(),
+            transforms.Normalize(normalization[0], normalization[1])
+        ])
 
         self.train = getattr(datasets, datasetName)('datasets', train=True, download=True, transform=transform)
         self.test = getattr(datasets, datasetName)('datasets', train=False, transform=transform)

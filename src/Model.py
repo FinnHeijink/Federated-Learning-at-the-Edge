@@ -4,10 +4,10 @@ from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss, normali
 from itertools import chain
 
 class MLP(nn.Module):
-    def __init__(self, inputSize, hiddenSize, outputSize, batchNorm):
+    def __init__(self, inputSize, hiddenSize, outputSize, batchNorm, dtype):
         super(MLP, self).__init__()
-        self.hiddenLayer = nn.Linear(inputSize, hiddenSize, bias=True)
-        self.outputLayer = nn.Linear(hiddenSize, outputSize, bias=False)
+        self.hiddenLayer = nn.Linear(inputSize, hiddenSize, bias=True, dtype=dtype)
+        self.outputLayer = nn.Linear(hiddenSize, outputSize, bias=False, dtype=dtype)
         self.batchNorm = nn.BatchNorm1d(hiddenSize, **batchNorm)
 
         self.inputSize = inputSize
@@ -15,7 +15,7 @@ class MLP(nn.Module):
         self.outputSize = outputSize
 
     def forward(self, x):
-        return self.outputLayer(relu(self.batchNorm(self.hiddenLayer(x))))
+        return self.outputLayer(relu(self.batchNorm(self.hiddenLayer(x)), inplace=True))
 
     def getOutputSize(self):
         return self.outputSize
@@ -27,12 +27,14 @@ class MLP(nn.Module):
         return self.hiddenSize
 
 class Classifier(nn.Module):
-    def __init__(self, classCount, hiddenSize, encoder, encoderName, batchNorm):
+    def __init__(self, classCount, hiddenSize, encoder, encoderName, batchNorm, dtypeName):
         super(Classifier, self).__init__()
 
-        self.encoder = globals()[encoderName](batchConfig=batchNorm, **encoder)
-        self.outputLayer = MLP(self.encoder.getOutputSize(), hiddenSize, classCount, batchNorm=batchNorm)
-        #self.outputLayer = nn.Linear(self.encoder.getOutputSize(), classCount)
+        dtype = getattr(torch, dtypeName)
+
+        self.encoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, **encoder)
+        self.outputLayer = MLP(self.encoder.getOutputSize(), hiddenSize, classCount, batchNorm=batchNorm, dtype=dtype)
+        #self.outputLayer = nn.Linear(self.encoder.getOutputSize(), classCount, dtype=dtype)
 
         for param in self.encoder.parameters():
             param.requires_grad = False
@@ -65,27 +67,27 @@ class Classifier(nn.Module):
         return self.outputLayer.parameters()
 
 class Encoder(nn.Module):
-    def __init__(self, imageDims, imageChannels, batchConfig, outputChannels=64, hiddenChannels=32, kernelSize=3):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, outputChannels=64, hiddenChannels=32, kernelSize=3):
         super(Encoder, self).__init__()
 
         self.imageDims = imageDims
         self.outputChannels = outputChannels
 
-        self.conv1 = nn.Conv2d(imageChannels, hiddenChannels, kernelSize, 1)
-        self.conv2 = nn.Conv2d(hiddenChannels, outputChannels, kernelSize, 1)
+        self.conv1 = nn.Conv2d(imageChannels, hiddenChannels, kernelSize, 1, dtype=dtype)
+        self.conv2 = nn.Conv2d(hiddenChannels, outputChannels, kernelSize, 1, dtype=dtype)
         self.dropout = nn.Dropout(0.2)
 
     def getOutputSize(self):
         return self.outputChannels * (self.imageDims[0] - 4) // 2 * (self.imageDims[1] - 4) // 2 #-4 due to the two 3x3 kernels, / 2 due to the pooling
 
     def forward(self, x):
-        x = relu(self.conv1(x))
-        x = relu(self.conv2(x))
+        x = relu(self.conv1(x), inplace=True)
+        x = relu(self.conv2(x), inplace=True)
         x = self.dropout(max_pool2d(x, 2))
         return torch.flatten(x, 1)
 
 class MobileNetV2Block(nn.Module):
-    def __init__(self, inputChannels, outputChannels, batchConfig, expansionFactor=6, downSample=False):
+    def __init__(self, inputChannels, outputChannels, batchConfig, dtype, expansionFactor=6, downSample=False):
         super(MobileNetV2Block, self).__init__()
 
         self.downSample = downSample
@@ -93,16 +95,16 @@ class MobileNetV2Block(nn.Module):
 
         internalChannels = inputChannels * expansionFactor
 
-        self.conv1 = nn.Conv2d(inputChannels, internalChannels, 1, bias=False)
-        self.bn1 = nn.BatchNorm2d(internalChannels, **batchConfig)
-        self.conv2 = nn.Conv2d(internalChannels, internalChannels, 3, stride=2 if downSample else 1, groups=internalChannels, bias=False, padding=1)
-        self.bn2 = nn.BatchNorm2d(internalChannels, **batchConfig)
-        self.conv3 = nn.Conv2d(internalChannels, outputChannels, 1, bias=False)
-        self.bn3 = nn.BatchNorm2d(outputChannels, **batchConfig)
+        self.conv1 = nn.Conv2d(inputChannels, internalChannels, 1, bias=False, dtype=dtype)
+        self.bn1 = nn.BatchNorm2d(internalChannels, **batchConfig, dtype=dtype)
+        self.conv2 = nn.Conv2d(internalChannels, internalChannels, 3, stride=2 if downSample else 1, groups=internalChannels, bias=False, padding=1, dtype=dtype)
+        self.bn2 = nn.BatchNorm2d(internalChannels, **batchConfig, dtype=dtype)
+        self.conv3 = nn.Conv2d(internalChannels, outputChannels, 1, bias=False, dtype=dtype)
+        self.bn3 = nn.BatchNorm2d(outputChannels, **batchConfig, dtype=dtype)
 
     def forward(self, x):
-        y = relu6(self.bn1(self.conv1(x)))
-        y = relu6(self.bn2(self.conv2(y)))
+        y = relu6(self.bn1(self.conv1(x)), inplace=True)
+        y = relu6(self.bn2(self.conv2(y)), inplace=True)
         y = self.bn3(self.conv3(y))
 
         if self.shortcut:
@@ -111,30 +113,30 @@ class MobileNetV2Block(nn.Module):
             return y
 
 class MobileNetV2(nn.Module):
-    def __init__(self, imageDims, imageChannels, batchConfig):
+    def __init__(self, dtype, imageDims, imageChannels, batchConfig):
         super(MobileNetV2, self).__init__()
 
         self.conv0 = nn.Conv2d(imageChannels, 32, 3, padding=1, bias=False)
         self.bn0 = nn.BatchNorm2d(32)
 
         self.blocks = nn.Sequential(
-            MobileNetV2Block(32, 16, batchConfig, expansionFactor=1, downSample=False),
-            MobileNetV2Block(16, 24, batchConfig, downSample=False),
-            MobileNetV2Block(24, 24, batchConfig),
-            MobileNetV2Block(24, 32, batchConfig, downSample=False),
-            MobileNetV2Block(32, 32, batchConfig),
-            MobileNetV2Block(32, 32, batchConfig),
-            MobileNetV2Block(32, 64, batchConfig, downSample=True),
-            MobileNetV2Block(64, 64, batchConfig),
-            MobileNetV2Block(64, 64, batchConfig),
-            MobileNetV2Block(64, 64, batchConfig),
-            MobileNetV2Block(64, 96, batchConfig, downSample=False),
-            MobileNetV2Block(96, 96, batchConfig),
-            MobileNetV2Block(96, 96, batchConfig),
-            MobileNetV2Block(96, 160, batchConfig, downSample=True),
-            MobileNetV2Block(160, 160, batchConfig),
-            MobileNetV2Block(160, 160, batchConfig),
-            MobileNetV2Block(160, 320, batchConfig, downSample=False))
+            MobileNetV2Block(32, 16, batchConfig, dtype, expansionFactor=1, downSample=False),
+            MobileNetV2Block(16, 24, batchConfig, dtype, downSample=False),
+            MobileNetV2Block(24, 24, batchConfig, dtype),
+            MobileNetV2Block(24, 32, batchConfig, dtype, downSample=False),
+            MobileNetV2Block(32, 32, batchConfig, dtype),
+            MobileNetV2Block(32, 32, batchConfig, dtype),
+            MobileNetV2Block(32, 64, batchConfig, dtype, downSample=True),
+            MobileNetV2Block(64, 64, batchConfig, dtype),
+            MobileNetV2Block(64, 64, batchConfig, dtype),
+            MobileNetV2Block(64, 64, batchConfig, dtype),
+            MobileNetV2Block(64, 96, batchConfig, dtype, downSample=False),
+            MobileNetV2Block(96, 96, batchConfig, dtype),
+            MobileNetV2Block(96, 96, batchConfig, dtype),
+            MobileNetV2Block(96, 160, batchConfig, dtype, downSample=True),
+            MobileNetV2Block(160, 160, batchConfig, dtype),
+            MobileNetV2Block(160, 160, batchConfig, dtype),
+            MobileNetV2Block(160, 320, batchConfig, dtype, downSample=False))
 
         # last conv layers and fc layer
         self.conv1 = nn.Conv2d(320, 1280, 1, bias=False)
@@ -152,33 +154,33 @@ class MobileNetV2(nn.Module):
         return y
 
 class MobileNetV2Short(nn.Module):
-    def __init__(self, imageDims, imageChannels, batchConfig):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
         super(MobileNetV2Short, self).__init__()
 
         self.conv0 = nn.Conv2d(imageChannels, 32, 3, padding=1, bias=False)
         self.bn0 = nn.BatchNorm2d(32)
 
         self.blocks = nn.Sequential(
-            MobileNetV2Block(32, 16, batchConfig, expansionFactor=1, downSample=False),
-            MobileNetV2Block(16, 24, batchConfig, downSample=False),
-            #MobileNetV2Block(24, 24, batchConfig),
-            MobileNetV2Block(24, 32, batchConfig, downSample=False),
-            #MobileNetV2Block(32, 32, batchConfig),
-            #MobileNetV2Block(32, 32, batchConfig),
-            MobileNetV2Block(32, 64, batchConfig, downSample=True),
-            #MobileNetV2Block(64, 64, batchConfig),
-            #MobileNetV2Block(64, 64, batchConfig),
-            #MobileNetV2Block(64, 64, batchConfig),
-            MobileNetV2Block(64, 96, batchConfig, downSample=False),
-            #MobileNetV2Block(96, 96, batchConfig),
-            #MobileNetV2Block(96, 96, batchConfig),
-            MobileNetV2Block(96, 160, batchConfig, downSample=True),
-            #MobileNetV2Block(160, 160, batchConfig),
-            #MobileNetV2Block(160, 160, batchConfig),
-            MobileNetV2Block(160, 320, batchConfig, downSample=False))
+            MobileNetV2Block(32, 16, batchConfig, dtype, expansionFactor=1, downSample=False),
+            MobileNetV2Block(16, 24, batchConfig, dtype, downSample=False),
+            #MobileNetV2Block(24, 24, batchConfig, dtype),
+            MobileNetV2Block(24, 32, batchConfig, dtype, downSample=False),
+            #MobileNetV2Block(32, 32, batchConfig, dtype),
+            #MobileNetV2Block(32, 32, batchConfig, dtype),
+            MobileNetV2Block(32, 64, batchConfig, dtype, downSample=True),
+            #MobileNetV2Block(64, 64, batchConfig, dtype),
+            #MobileNetV2Block(64, 64, batchConfig, dtype),
+            #MobileNetV2Block(64, 64, batchConfig, dtype),
+            MobileNetV2Block(64, 96, batchConfig, dtype, downSample=False),
+            #MobileNetV2Block(96, 96, batchConfig, dtype),
+            #MobileNetV2Block(96, 96, batchConfig, dtype),
+            MobileNetV2Block(96, 160, batchConfig, dtype, downSample=True),
+            #MobileNetV2Block(160, 160, batchConfig, dtype),
+            #MobileNetV2Block(160, 160, batchConfig, dtype),
+            MobileNetV2Block(160, 320, batchConfig, dtype, downSample=False))
 
         # last conv layers and fc layer
-        self.conv1 = nn.Conv2d(320, 1280, 1, bias=False)
+        self.conv1 = nn.Conv2d(320, 1280, 1, bias=False, dtype=dtype)
         self.bn1 = nn.BatchNorm2d(1280)
 
     def getOutputSize(self):
@@ -193,16 +195,18 @@ class MobileNetV2Short(nn.Module):
         return y
 
 class BYOL(nn.Module):
-    def __init__(self, emaScheduler, encoderName, predictor, projector, encoder, batchNorm):
+    def __init__(self, emaScheduler, encoderName, predictor, projector, encoder, batchNorm, dtypeName):
         super(BYOL, self).__init__()
 
         self.emaScheduler = emaScheduler
 
-        self.onlineEncoder = globals()[encoderName](batchConfig=batchNorm, **encoder)
-        self.targetEncoder = globals()[encoderName](batchConfig=batchNorm, **encoder)
-        self.onlineProjector = MLP(inputSize=self.onlineEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
-        self.targetProjector = MLP(inputSize=self.targetEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
-        self.predictor = MLP(inputSize=self.onlineProjector.getOutputSize(), outputSize=self.targetProjector.getOutputSize(), batchNorm=batchNorm, **predictor)
+        dtype = getattr(torch, dtypeName)
+
+        self.onlineEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, **encoder)
+        self.targetEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, **encoder)
+        self.onlineProjector = MLP(dtype=dtype, inputSize=self.onlineEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
+        self.targetProjector = MLP(dtype=dtype, inputSize=self.targetEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
+        self.predictor = MLP(dtype=dtype, inputSize=self.onlineProjector.getOutputSize(), outputSize=self.targetProjector.getOutputSize(), batchNorm=batchNorm, **predictor)
 
         # Make sure the target network starts out the same as the online network
         for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):

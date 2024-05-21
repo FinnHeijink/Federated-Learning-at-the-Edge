@@ -7,6 +7,7 @@ def GetConfig():
         loadFromCheckpoint=True,
         loadFromSpecificCheckpoint=None,
         printStatistics=True,
+        useHalfPrecision=True,
 
         augmenter=dict(
             imageDims=(0, 0), #autoset
@@ -93,11 +94,14 @@ def GetConfig():
     )
 
     config["BYOL"]["batchNorm"] = config["batchNorm"]
+    config["BYOL"]["dtypeName"] = "float16" if config["useHalfPrecision"] else "float32"
+    config["classifier"]["dtypeName"] = "float16" if config["useHalfPrecision"] else "float32"
     config["classifier"]["batchNorm"] = config["batchNorm"]
     config["classifier"]["encoder"] = config["BYOL"]["encoder"]
     config["classifier"]["encoderName"] = config["BYOL"]["encoderName"]
     config["dataBuffer"]["batchSize"] = config["dataset"]["batchSize"]
     config["EMA"]["epochCount"] = config["training"]["epochs"]
+    config["dataset"]["useHalfPrecision"] = config["useHalfPrecision"]
 
     config["optimizer"]["settings"]["lr"] = config["optimizer"]["settings"]["lr"] * config["dataset"]["batchSize"] / 32
 

@@ -1,6 +1,7 @@
 import skopt
 import skopt.space as space
 import subprocess
+import pickle
 
 searchSpace = list()
 searchSpace.append(space.Real(1e-6, 1e-2, "log-uniform", name="--optimizer.settings.weight_decay"))
@@ -35,3 +36,4 @@ def evaluateModel(**params):
 
 result = skopt.gp_minimize(evaluateModel, searchSpace)
 print(result)
+pickle.dump(result, open("HyperParameterOptimizerResult.dat", "w"))
