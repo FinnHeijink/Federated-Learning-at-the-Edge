@@ -1,7 +1,6 @@
 import torch
 import torchvision.transforms.v2 as transforms
 
-
 class ImageAugmenter:
     def __init__(self, imageDims, applyFlips=False, applyColorAugments=False):
         self.transform = transforms.Compose([
@@ -15,7 +14,7 @@ class ImageAugmenter:
                 self.transform,
                 transforms.ColorJitter(0.4, 0.4, 0.2, 0.1),
                 transforms.RandomGrayscale(p=0.2),
-                transforms.GaussianBlur(9, sigma=(0.1, 0.2)),
+                #transforms.GaussianBlur(9, sigma=(0.1, 0.2)),
                 transforms.RandomSolarize(threshold=0.5, p=0.2)
             ])
 
