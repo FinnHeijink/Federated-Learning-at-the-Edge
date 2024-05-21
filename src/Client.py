@@ -161,7 +161,8 @@ class Client:
         self.config = config
         self.dataSource = dataSource
 
-        self.model = Model.BYOL(**config["EMA"], **config["BYOL"]).to(device)
+        self.emaScheduler = Util.EMAScheduler(**config["EMA"]) # Todo: update EMA
+        self.model = Model.BYOL(self.emaScheduler, **config["BYOL"]).to(device)
         self.optimizer = getattr(optim, config["optimizer"]["name"])(self.model.trainableParameters(), **config["optimizer"]["settings"])
 
         self.augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])

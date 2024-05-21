@@ -8,6 +8,7 @@ import Model
 import Communication
 import Checkpointer
 import Dataset
+import Util
 import main as mainModule # Todo: clean up
 
 class Server:
@@ -26,13 +27,14 @@ class Server:
 
         self.classifier = Model.Classifier(**config["classifier"]).to(device)
         self.classifierOptimizer = getattr(optim, config["optimizer"]["name"])(self.classifier.trainableParameters(), **config["optimizer"]["settings"])
+        self.emaScheduler = Util.EMAScheduler(**config["EMA"])
 
         self.dataset = Dataset.Dataset(**config["dataset"])
 
         self.communicationServer = Communication.Server()
 
         self.clients = []
-        self.currentModel = Model.BYOL(**self.config["EMA"], **self.config["BYOL"])
+        self.currentModel = Model.BYOL(self.emaScheduler, **self.config["BYOL"])
 
     def bind(self, ip, port):
 
@@ -47,7 +49,7 @@ class Server:
             else:
                 print(f"Accepted client at {addr}")
 
-                client = self.ServerClient(comm, addr, Model.BYOL(**self.config["EMA"], **self.config["BYOL"]))
+                client = self.ServerClient(comm, addr, Model.BYOL(self.emaScheduler, **self.config["BYOL"]))
                 self.clients.append(client)
                 self.updateClientCommunication(client)
 
