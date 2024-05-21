@@ -30,7 +30,7 @@ class Classifier(nn.Module):
     def __init__(self, classCount, hiddenSize, encoder, encoderName, batchNorm):
         super(Classifier, self).__init__()
 
-        self.encoder = globals()[encoderName](**encoder)
+        self.encoder = globals()[encoderName](batchConfig=batchNorm, **encoder)
         self.outputLayer = MLP(self.encoder.getOutputSize(), hiddenSize, classCount, batchNorm=batchNorm)
         #self.outputLayer = nn.Linear(self.encoder.getOutputSize(), classCount)
 
