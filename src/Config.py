@@ -7,7 +7,7 @@ def GetConfig():
         loadFromCheckpoint=True,
         loadFromSpecificCheckpoint=None,
         printStatistics=True,
-        useHalfPrecision=True,
+        useHalfPrecision=False,
 
         augmenter=dict(
             imageDims=(0, 0), #autoset

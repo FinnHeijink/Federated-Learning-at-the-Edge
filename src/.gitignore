@@ -1,3 +1,4 @@
 .virtualenvs/
 checkpoints/
 __pycache__
+*.svg

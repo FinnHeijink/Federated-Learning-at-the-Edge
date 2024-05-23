@@ -1,6 +1,6 @@
 import skopt
 import skopt.space as space
-import subprocess
+import MainWrapped
 import pickle
 
 searchSpace = list()
@@ -19,17 +19,7 @@ def evaluateModel(**params):
 
     print("Running with cmdline:", cmdline)
 
-    result = subprocess.run(cmdline, stdout=subprocess.PIPE)
-    if result.returncode != 0:
-        raise RuntimeError
-
-    output = str(result.stdout)
-    print(output)
-
-    accuracy = output[output.find("Final accuracy: ") + len("Final accuracy: "):]
-    accuracy = accuracy[:accuracy.find("\\")]
-    accuracy = float(accuracy)
-
+    output, accuracy = MainWrapped.RunMain(cmdline)
     print("Accuracy:", accuracy)
 
     return 1.0 - accuracy
