@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss, normalize, relu6, adaptive_avg_pool2d
@@ -66,25 +68,46 @@ class Classifier(nn.Module):
     def trainableParameters(self):
         return self.outputLayer.parameters()
 
-class Encoder(nn.Module):
-    def __init__(self, imageDims, imageChannels, batchConfig, dtype, outputChannels=64, hiddenChannels=32, kernelSize=3):
-        super(Encoder, self).__init__()
+class GenericEncoder(nn.Module):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, channels):
+        super(GenericEncoder, self).__init__()
 
         self.imageDims = imageDims
-        self.outputChannels = outputChannels
+        self.outputChannels = channels[-1]
 
-        self.conv1 = nn.Conv2d(imageChannels, hiddenChannels, kernelSize, 1, dtype=dtype)
-        self.conv2 = nn.Conv2d(hiddenChannels, outputChannels, kernelSize, 1, dtype=dtype)
-        self.dropout = nn.Dropout(0.2)
+        self.convs = []
+        lastChannelCount = imageChannels
+        for channel in channels:
+            self.convs.append(nn.Conv2d(lastChannelCount, channel, 3, 1, dtype=dtype))
 
     def getOutputSize(self):
-        return self.outputChannels * (self.imageDims[0] - 4) // 2 * (self.imageDims[1] - 4) // 2 #-4 due to the two 3x3 kernels, / 2 due to the pooling
+        return self.outputChannels * (self.imageDims[0] - 2 * len(self.convs)) // 2 * (self.imageDims[1] - 2 * len(self.convs)) // 2
 
     def forward(self, x):
-        x = relu(self.conv1(x), inplace=True)
-        x = relu(self.conv2(x), inplace=True)
-        x = self.dropout(max_pool2d(x, 2))
-        return torch.flatten(x, 1)
+        for conv in self.convs:
+            x = relu(conv(x), inplace=True)
+        x = max_pool2d(x)
+        return torch.flatten(x)
+
+class Encoder(GenericEncoder):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, outputChannels=64, hiddenChannels=32):
+        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[hiddenChannels, outputChannels])
+
+class EncoderType1(GenericEncoder):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
+        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[2, 4])
+
+class EncoderType2(GenericEncoder):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
+        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[4, 8])
+
+class EncoderType3(GenericEncoder):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
+        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[4, 8, 12])
+
+class EncoderType4(GenericEncoder):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
+        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[6, 12, 18, 24, 30])
 
 class MobileNetV2Block(nn.Module):
     def __init__(self, inputChannels, outputChannels, batchConfig, dtype, expansionFactor=6, downSample=False):
@@ -235,6 +258,9 @@ class BYOL(nn.Module):
             return MSELoss(normalize(a, dim=1), normalize(b, dim=1))
 
         onlineLoss = (RegressionLoss(image1Predicted, image2Target) + RegressionLoss(image2Predicted, image1Target)) / 2
+
+        if torch.isnan(onlineLoss).any():
+            breakpoint()
 
         return onlineLoss
 
