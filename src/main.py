@@ -34,8 +34,6 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
         if batchIndex % 10 == 0:
             print(f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxTrainBatches * 100:.1f}%: BYOLLoss={loss:.4f}")
 
-    torch.save(byol.state_dict(), "src/checkpoints/ModelLong.pt")
-
 def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, epoch, maxEpochs):
     classifier.train()
 
@@ -140,6 +138,7 @@ def main():
             classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
 
         lrScheduler = Util.WarmupCosineScheduler(byolOptimizer, startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
+        emaScheduler.startStep(startEpoch)
 
         augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 

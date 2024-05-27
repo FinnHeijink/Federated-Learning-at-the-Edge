@@ -68,5 +68,9 @@ class EMAScheduler:
 
         self.tau = 1 - (1 - self.initialTau) * 0.5 * (1 + math.cos(math.pi * currentEpoch / self.epochCount))
 
+    def startStep(self, steps):
+        for i in range(steps):
+            self.step(i)
+
     def getTau(self):
         return self.tau

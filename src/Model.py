@@ -73,21 +73,23 @@ class GenericEncoder(nn.Module):
         super(GenericEncoder, self).__init__()
 
         self.imageDims = imageDims
-        self.outputChannels = channels[-1]
+        self.channels = channels
 
-        self.convs = []
+        sequence = []
         lastChannelCount = imageChannels
         for channel in channels:
-            self.convs.append(nn.Conv2d(lastChannelCount, channel, 3, 1, dtype=dtype))
+            sequence.append(nn.Conv2d(lastChannelCount, channel, 3, 1, dtype=dtype))
+            lastChannelCount = channel
+            sequence.append(nn.ReLU())
+        self.sequence = nn.Sequential(*sequence)
 
     def getOutputSize(self):
-        return self.outputChannels * (self.imageDims[0] - 2 * len(self.convs)) // 2 * (self.imageDims[1] - 2 * len(self.convs)) // 2
+        return self.channels[-1] * (self.imageDims[0] - 2 * len(self.channels)) // 2 * (self.imageDims[1] - 2 * len(self.channels)) // 2
 
     def forward(self, x):
-        for conv in self.convs:
-            x = relu(conv(x), inplace=True)
-        x = max_pool2d(x)
-        return torch.flatten(x)
+        x = self.sequence(x)
+        x = max_pool2d(x, 2)
+        return torch.flatten(x, 1)
 
 class Encoder(GenericEncoder):
     def __init__(self, imageDims, imageChannels, batchConfig, dtype, outputChannels=64, hiddenChannels=32):
@@ -95,19 +97,19 @@ class Encoder(GenericEncoder):
 
 class EncoderType1(GenericEncoder):
     def __init__(self, imageDims, imageChannels, batchConfig, dtype):
-        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[2, 4])
+        super(EncoderType1, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[2, 4])
 
 class EncoderType2(GenericEncoder):
     def __init__(self, imageDims, imageChannels, batchConfig, dtype):
-        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[4, 8])
+        super(EncoderType2, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[4, 8])
 
 class EncoderType3(GenericEncoder):
     def __init__(self, imageDims, imageChannels, batchConfig, dtype):
-        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[4, 8, 12])
+        super(EncoderType3, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[4, 8, 12])
 
 class EncoderType4(GenericEncoder):
     def __init__(self, imageDims, imageChannels, batchConfig, dtype):
-        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[6, 12, 18, 24, 30])
+        super(EncoderType4, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[6, 12, 18, 24, 30])
 
 class MobileNetV2Block(nn.Module):
     def __init__(self, inputChannels, outputChannels, batchConfig, dtype, expansionFactor=6, downSample=False):
