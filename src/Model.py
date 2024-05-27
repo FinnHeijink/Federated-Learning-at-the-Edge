@@ -241,18 +241,32 @@ class BYOL(nn.Module):
     def forward(self, dataView1, dataView2):
         # dimensions of dataView1,2: [batchSize, channelCount, imageWidth, imageHeight]
 
-        image1OnlineEncoded = self.onlineEncoder(dataView1)
-        image1Online = self.onlineProjector(image1OnlineEncoded)
-        image1Predicted = self.predictor(image1Online)
-        with torch.no_grad():
-            image1Target = self.targetProjector(self.targetEncoder(dataView1)).detach()
+        # Standard BYOL approach
+        if (self.emaScheduler.getTau() != 0):
+            image1OnlineEncoded = self.onlineEncoder(dataView1)
+            image1Online = self.onlineProjector(image1OnlineEncoded)
+            image1Predicted = self.predictor(image1Online)
+            with torch.no_grad():
+                image1Target = self.targetProjector(self.targetEncoder(dataView1)).detach()
 
-        image2OnlineEncoded = self.onlineEncoder(dataView2)
-        image2Online = self.onlineProjector(image2OnlineEncoded)
-        image2Predicted = self.predictor(image2Online)
-        with torch.no_grad():
-            image2Target = self.targetProjector(self.targetEncoder(dataView2)).detach()
+            image2OnlineEncoded = self.onlineEncoder(dataView2)
+            image2Online = self.onlineProjector(image2OnlineEncoded)
+            image2Predicted = self.predictor(image2Online)
+            with torch.no_grad():
+                image2Target = self.targetProjector(self.targetEncoder(dataView2)).detach()
+        # Simplified SimSiam approach
+        else:
+            image1OnlineEncoded = self.onlineEncoder(dataView1)
+            image1Online = self.onlineProjector(image1OnlineEncoded)
+            image1Predicted = self.predictor(image1Online)
+            with torch.no_grad():
+                image1Target = image1Online.detach()
 
+            image2OnlineEncoded = self.onlineEncoder(dataView2)
+            image2Online = self.onlineProjector(image2OnlineEncoded)
+            image2Predicted = self.predictor(image2Online)
+            with torch.no_grad():
+                image2Target = image2Online.detach()
         def MSELoss(a, b):
             return torch.mean(torch.square(a - b))
 
@@ -268,8 +282,14 @@ class BYOL(nn.Module):
 
     def stepEMA(self):
         tau = self.emaScheduler.getTau()
-        for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
-            targetParam.data = targetParam.data + (onlineParam.data - targetParam.data) * (1.0 - tau)
+        # Standard BYOL approach
+        if (tau != 0):
+            for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
+                targetParam.data = targetParam.data + (onlineParam.data - targetParam.data) * (1.0 - tau)
+        # Simplified SimSiam approach
+        else:
+            for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
+                targetParam.data = onlineParam.data
 
     def trainableParameters(self):
         return chain(
