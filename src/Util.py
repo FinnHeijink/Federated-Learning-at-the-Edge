@@ -16,8 +16,10 @@ def PlotStatistics(statistics):
     accuracy = statistics[:,1]
     epochs = statistics[:,2]
 
+    plt.figure(figsize=(10,10))
     plt.plot(epochs, loss, label="Loss")
     plt.plot(epochs, accuracy, label="Accuracy")
+    plt.grid()
     plt.xlabel("Epochs #")
     plt.ylim(0)
     plt.legend()
