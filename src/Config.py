@@ -4,7 +4,7 @@ def GetConfig():
     config = dict(
         device="cuda",
         mode="pretrain",
-        loadFromCheckpoint=True,
+        loadFromCheckpoint=False,
         loadFromSpecificCheckpoint=None,
         printStatistics=True,
         useHalfPrecision=False,
@@ -22,13 +22,13 @@ def GetConfig():
             classifierEpochs=1,
         ),
         dataset=dict(
-            datasetName="CIFAR10",
+            datasetName="MNIST",
             normalization=None, #autoset
             batchSize=32,
             classificationSplit=0.1,
         ),
         EMA=dict(
-            initialTau=0.90,
+            initialTau=0,
             epochCount=None, #autoset
             enableSchedule=True
         ),
