@@ -16,19 +16,19 @@ def GetConfig():
         ),
 
         training=dict(
-            epochs=75,
+            epochs=100,
             warmupEpochs=10,
-            evaluateEveryNEpochs=5,
+            evaluateEveryNEpochs=1,
             classifierEpochs=1,
         ),
         dataset=dict(
-            datasetName="MNIST",
+            datasetName="FashionMNIST",
             normalization=None, #autoset
-            batchSize=32,
+            batchSize=128,
             classificationSplit=0.1,
         ),
         EMA=dict(
-            initialTau=0,
+            initialTau=0.0,
             epochCount=None, #autoset
             enableSchedule=True
         ),
