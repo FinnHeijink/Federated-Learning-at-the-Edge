@@ -22,6 +22,7 @@ def PlotAccuracyVSTau():
     plt.xlabel("$\\tau$")
     plt.ylabel("Accuracy [%]")
     plt.savefig("AccuracyVsTau.svg")
+    plt.grid()
     plt.show()
 
 PlotAccuracyVSTau()
