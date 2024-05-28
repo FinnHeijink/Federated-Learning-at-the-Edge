@@ -1,9 +1,31 @@
 import math
+import numpy as np
 
 import torch
 import torch.nn as nn
 from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss, normalize, relu6, adaptive_avg_pool2d
 from itertools import chain
+
+def GetLinearComputeCost(inputSize, outputSize, bias):
+    if bias:
+        inputSize += 1
+
+    multiplies = inputSize * outputSize
+    adds = outputSize * (inputSize - 1)
+    params = inputSize * outputSize
+    return np.array((multiplies, adds, params))
+
+def GetConvolutionalComputeCost(inputDims, inputChannels, outputChannels, kernelSize, stride=1):
+    perPixel = np.array((kernelSize ** 2, kernelSize ** 2 + 1))
+
+    pixels = (inputDims[0] - (kernelSize - 1) / 2)/stride * (inputDims[1] - (kernelSize - 1) / 2)/stride
+
+    totalMA = perPixel * pixels * inputChannels * outputChannels
+    params = kernelSize ** 2 * inputChannels * outputChannels
+    return np.concatenate((totalMA, [params]))
+
+def GetBatchNormComputeCost(size):
+    return np.array((0, 0, 0))
 
 class MLP(nn.Module):
     def __init__(self, inputSize, hiddenSize, outputSize, batchNorm, dtype):
@@ -27,6 +49,11 @@ class MLP(nn.Module):
 
     def getHiddenSize(self):
         return self.hiddenSize
+
+    def getComputeCost(self):
+        return GetLinearComputeCost(self.inputSize, self.hiddenSize, True) +\
+            GetLinearComputeCost(self.hiddenSize, self.outputSize, False) +\
+            GetBatchNormComputeCost(self.hiddenSize)
 
 class Classifier(nn.Module):
     def __init__(self, classCount, hiddenSize, encoder, encoderName, batchNorm, dtypeName):
@@ -68,6 +95,9 @@ class Classifier(nn.Module):
     def trainableParameters(self):
         return self.outputLayer.parameters()
 
+    def getComputeCost(self):
+        return self.encoder.getComputeCost() + self.outputLayer.getComputeCost()
+
 class GenericEncoder(nn.Module):
     def __init__(self, imageDims, imageChannels, batchConfig, dtype, channels):
         super(GenericEncoder, self).__init__()
@@ -77,10 +107,21 @@ class GenericEncoder(nn.Module):
 
         sequence = []
         lastChannelCount = imageChannels
+        computeCost = np.zeros((3,))
+        currentImageDims = list(imageDims)
+
         for channel in channels:
             sequence.append(nn.Conv2d(lastChannelCount, channel, 3, 1, dtype=dtype))
-            lastChannelCount = channel
             sequence.append(nn.ReLU())
+
+            computeCost += GetConvolutionalComputeCost(currentImageDims, lastChannelCount, channel, 3)
+
+            currentImageDims[0] -= 1
+            currentImageDims[1] -= 1
+            lastChannelCount = channel
+
+        self.computeCost = computeCost
+
         self.sequence = nn.Sequential(*sequence)
 
     def getOutputSize(self):
@@ -90,6 +131,9 @@ class GenericEncoder(nn.Module):
         x = self.sequence(x)
         x = max_pool2d(x, 2)
         return torch.flatten(x, 1)
+
+    def getComputeCost(self):
+        return self.computeCost
 
 class Encoder(GenericEncoder):
     def __init__(self, imageDims, imageChannels, batchConfig, dtype, outputChannels=64, hiddenChannels=32):
@@ -112,13 +156,17 @@ class EncoderType4(GenericEncoder):
         super(EncoderType4, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[6, 12, 18, 24, 30])
 
 class MobileNetV2Block(nn.Module):
-    def __init__(self, inputChannels, outputChannels, batchConfig, dtype, expansionFactor=6, downSample=False):
+    def __init__(self, imageDims, inputChannels, outputChannels, batchConfig, dtype, expansionFactor=6, downSample=False):
         super(MobileNetV2Block, self).__init__()
 
         self.downSample = downSample
         self.shortcut = (not downSample) and (inputChannels == outputChannels)
+        self.imageDims = imageDims
 
         internalChannels = inputChannels * expansionFactor
+
+        self.inputChannels = inputChannels
+        self.internalChannels = internalChannels
 
         self.conv1 = nn.Conv2d(inputChannels, internalChannels, 1, bias=False, dtype=dtype)
         self.bn1 = nn.BatchNorm2d(internalChannels, **batchConfig, dtype=dtype)
@@ -137,6 +185,16 @@ class MobileNetV2Block(nn.Module):
         else:
             return y
 
+    def getComputeCost(self):
+        hiddenDims = self.imageDims
+        if self.downSample:
+            hiddenDims[0] /= 2
+            hiddenDims[1] /= 2
+
+        return GetConvolutionalComputeCost(self.imageDims, self.inputChannels, self.internalChannels, 1) +\
+            GetConvolutionalComputeCost(self.imageDims, self.internalChannels, self.internalChannels, 3, stride=2 if self.downSample else 1) +\
+            GetConvolutionalComputeCost(hiddenDims, self.internalChannels, self.outputChannels, 1)
+
 class MobileNetV2(nn.Module):
     def __init__(self, dtype, imageDims, imageChannels, batchConfig):
         super(MobileNetV2, self).__init__()
@@ -144,24 +202,33 @@ class MobileNetV2(nn.Module):
         self.conv0 = nn.Conv2d(imageChannels, 32, 3, padding=1, bias=False)
         self.bn0 = nn.BatchNorm2d(32)
 
-        self.blocks = nn.Sequential(
-            MobileNetV2Block(32, 16, batchConfig, dtype, expansionFactor=1, downSample=False),
-            MobileNetV2Block(16, 24, batchConfig, dtype, downSample=False),
-            MobileNetV2Block(24, 24, batchConfig, dtype),
-            MobileNetV2Block(24, 32, batchConfig, dtype, downSample=False),
-            MobileNetV2Block(32, 32, batchConfig, dtype),
-            MobileNetV2Block(32, 32, batchConfig, dtype),
-            MobileNetV2Block(32, 64, batchConfig, dtype, downSample=True),
-            MobileNetV2Block(64, 64, batchConfig, dtype),
-            MobileNetV2Block(64, 64, batchConfig, dtype),
-            MobileNetV2Block(64, 64, batchConfig, dtype),
-            MobileNetV2Block(64, 96, batchConfig, dtype, downSample=False),
-            MobileNetV2Block(96, 96, batchConfig, dtype),
-            MobileNetV2Block(96, 96, batchConfig, dtype),
-            MobileNetV2Block(96, 160, batchConfig, dtype, downSample=True),
-            MobileNetV2Block(160, 160, batchConfig, dtype),
-            MobileNetV2Block(160, 160, batchConfig, dtype),
-            MobileNetV2Block(160, 320, batchConfig, dtype, downSample=False))
+        blocks = [
+            MobileNetV2Block(imageDims, 32, 16, batchConfig, dtype, expansionFactor=1, downSample=False),
+            MobileNetV2Block(imageDims, 16, 24, batchConfig, dtype, downSample=False),
+            MobileNetV2Block(imageDims, 24, 24, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 24, 32, batchConfig, dtype, downSample=False),
+            MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 32, 64, batchConfig, dtype, downSample=True),
+            MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 64, 96, batchConfig, dtype, downSample=False),
+            MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 96, 160, batchConfig, dtype, downSample=True),
+            MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 160, 320, batchConfig, dtype, downSample=False)
+        ]
+
+        for block in blocks:
+            if block.downSample:
+                imageDims[0] /= 2
+                imageDims[1] /= 2
+                block.imageDims = imageDims
+
+        self.blocks = nn.Sequential(*blocks)
 
         # last conv layers and fc layer
         self.conv1 = nn.Conv2d(320, 1280, 1, bias=False)
@@ -178,31 +245,55 @@ class MobileNetV2(nn.Module):
         y = torch.squeeze(torch.squeeze(y, -1), -1)
         return y
 
+    def getComputeCost(self):
+        computeCost = GetConvolutionalComputeCost(self.imageDims, self.imageChannels, 32, 3)
+
+        for block in self.blockList:
+            computeCost += block.getComputeCost()
+
+        computeCost += GetConvolutionalComputeCost(self.lastLayerImageDims, 320, 1280, 1)
+
+        return computeCost
+
 class MobileNetV2Short(nn.Module):
     def __init__(self, imageDims, imageChannels, batchConfig, dtype):
         super(MobileNetV2Short, self).__init__()
 
+        self.imageDims = imageDims
+        self.imageChannels = imageChannels
+
         self.conv0 = nn.Conv2d(imageChannels, 32, 3, padding=1, bias=False)
         self.bn0 = nn.BatchNorm2d(32)
 
-        self.blocks = nn.Sequential(
-            MobileNetV2Block(32, 16, batchConfig, dtype, expansionFactor=1, downSample=False),
-            MobileNetV2Block(16, 24, batchConfig, dtype, downSample=False),
-            #MobileNetV2Block(24, 24, batchConfig, dtype),
-            MobileNetV2Block(24, 32, batchConfig, dtype, downSample=False),
-            #MobileNetV2Block(32, 32, batchConfig, dtype),
-            #MobileNetV2Block(32, 32, batchConfig, dtype),
-            MobileNetV2Block(32, 64, batchConfig, dtype, downSample=True),
-            #MobileNetV2Block(64, 64, batchConfig, dtype),
-            #MobileNetV2Block(64, 64, batchConfig, dtype),
-            #MobileNetV2Block(64, 64, batchConfig, dtype),
-            MobileNetV2Block(64, 96, batchConfig, dtype, downSample=False),
-            #MobileNetV2Block(96, 96, batchConfig, dtype),
-            #MobileNetV2Block(96, 96, batchConfig, dtype),
-            MobileNetV2Block(96, 160, batchConfig, dtype, downSample=True),
-            #MobileNetV2Block(160, 160, batchConfig, dtype),
-            #MobileNetV2Block(160, 160, batchConfig, dtype),
-            MobileNetV2Block(160, 320, batchConfig, dtype, downSample=False))
+        self.blockList = [
+            MobileNetV2Block(imageDims, 32, 16, batchConfig, dtype, expansionFactor=1, downSample=False),
+            MobileNetV2Block(imageDims, 16, 24, batchConfig, dtype, downSample=False),
+            # MobileNetV2Block(imageDims, 24, 24, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 24, 32, batchConfig, dtype, downSample=False),
+            # MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype),
+            # MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 32, 64, batchConfig, dtype, downSample=True),
+            # MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
+            # MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
+            # MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 64, 96, batchConfig, dtype, downSample=False),
+            # MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype),
+            # MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 96, 160, batchConfig, dtype, downSample=True),
+            # MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype),
+            # MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype),
+            MobileNetV2Block(imageDims, 160, 320, batchConfig, dtype, downSample=False)
+        ]
+
+        for block in self.blockList:
+            if block.downSample:
+                imageDims[0] /= 2
+                imageDims[1] /= 2
+                block.imageDims = imageDims
+
+        self.blocks = nn.Sequential(*self.blockList)
+
+        self.lastLayerImageDims = imageDims
 
         # last conv layers and fc layer
         self.conv1 = nn.Conv2d(320, 1280, 1, bias=False, dtype=dtype)
@@ -218,6 +309,16 @@ class MobileNetV2Short(nn.Module):
         y = adaptive_avg_pool2d(y, 1)
         y = torch.squeeze(torch.squeeze(y, -1), -1)
         return y
+
+    def getComputeCost(self):
+        computeCost = GetConvolutionalComputeCost(self.imageDims, self.imageChannels, 32, 3)
+
+        for block in self.blockList:
+            computeCost += block.getComputeCost()
+
+        computeCost += GetConvolutionalComputeCost(self.lastLayerImageDims, 320, 1280, 1)
+
+        return computeCost
 
 class BYOL(nn.Module):
     def __init__(self, emaScheduler, encoderName, predictor, projector, encoder, batchNorm, dtypeName):
@@ -270,6 +371,7 @@ class BYOL(nn.Module):
         tau = self.emaScheduler.getTau()
         for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
             targetParam.data = targetParam.data + (onlineParam.data - targetParam.data) * (1.0 - tau)
+            targetParam.requires_grad = False
 
     def trainableParameters(self):
         return chain(
@@ -297,3 +399,8 @@ class BYOL(nn.Module):
 
     def predictorParameters(self):
         return self.predictor.parameters()
+
+    def getForwardComputeCost(self):
+        computeCost = 2 * (self.onlineEncoder.getComputeCost() + self.onlineProjector.getComputeCost() + self.predictor.getComputeCost() + self.targetEncoder.getComputeCost() + self.targetProjector.getComputeCost())
+        computeCost[2] /= 2
+        return computeCost

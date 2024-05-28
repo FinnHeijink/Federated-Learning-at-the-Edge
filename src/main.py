@@ -1,8 +1,8 @@
 import torch
 import torch.optim as optim
+from torchsummary import summary
 
 import argparse
-import numpy as np
 
 import Checkpointer
 import Model
@@ -158,6 +158,9 @@ def main():
                 lrScheduler.step()
                 classifierOptimizer.param_groups[0]["lr"] = byolOptimizer.param_groups[0]["lr"]
                 emaScheduler.step(epoch)
+
+                byolCheckpointer.saveCheckpoint(byol, byolOptimizer)
+                byolCheckpointer.loadCheckpoint(None, byol, byolOptimizer)
         except KeyboardInterrupt:
             pass
 
@@ -208,6 +211,12 @@ def main():
             print("Final accuracy:", statistics[-1][1])
     else:
         raise NotImplementedError
+
+    if config["printStatistics"]:
+        computeCost = byol.getForwardComputeCost()
+        print("Multiplies:", computeCost[0])
+        print("Adds:", computeCost[1])
+        print("Memory:", computeCost[2] * (2 if config["useHalfPrecision"] else 4))
 
 if __name__ == "__main__":
     main()
