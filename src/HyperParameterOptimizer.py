@@ -12,18 +12,20 @@ searchSpace.append(space.Categorical(["Encoder", "MobileNetV2Short", "MobileNetV
 
 @skopt.utils.use_named_args(searchSpace)
 def evaluateModel(**params):
-    cmdline = ["src\\RunMainWrapped.bat", "--mode=pretrain", "--loadFromCheckpoint=false", "--printStatistics=false", "--training.epochs=1", "--training.classifierEpochs=5", "--dataset.classificationSplit=0.1", "--training.evaluateEveryNEpochs=1", "--training.warmupEpochs=0", "--EMA.enableSchedule=False"]
+    cmdline = ["--mode=pretrain", "--loadFromCheckpoint=false", "--printStatistics=false", "--training.epochs=1", "--training.classifierEpochs=5", "--dataset.classificationSplit=0.1", "--training.evaluateEveryNEpochs=1", "--training.warmupEpochs=0", "--EMA.enableSchedule=False"]
 
     for name, value in params.items():
        cmdline.append(name + "=" + str(value))
 
     print("Running with cmdline:", cmdline)
 
-    output, accuracy = MainWrapped.RunMain(cmdline)
+    output, accuracy = MainWrapped.RunMain(cmdline, useWrapper=False)
     print("Accuracy:", accuracy)
 
     return 1.0 - accuracy
 
 result = skopt.gp_minimize(evaluateModel, searchSpace)
 print(result)
-pickle.dump(result, open("HyperParameterOptimizerResult.dat", "w"))
+
+with open("HyperParameterOptimizerResult.dat", "wb") as handle:
+    pickle.dump(result, handle, protocol=pickle.HIGHEST_PROTOCOL)

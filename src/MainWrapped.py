@@ -1,6 +1,12 @@
 import subprocess
 
-def RunMain(cmdline):
+def RunMain(cmdline, useWrapper=False):
+
+    if useWrapper:
+        cmdline = ["src\\RunMainWrapped.bat"] + cmdline
+    else:
+        cmdline = ["python", "src\\main.py"] + cmdline
+
     result = subprocess.run(cmdline, stdout=subprocess.PIPE)
     if result.returncode != 0:
         raise RuntimeError
