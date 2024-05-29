@@ -40,6 +40,7 @@ class MLP(nn.Module):
 
     def forward(self, x):
         return self.outputLayer(relu(self.batchNorm(self.hiddenLayer(x)), inplace=True))
+        #return self.outputLayer(relu(self.hiddenLayer(x), inplace=True))
 
     def getOutputSize(self):
         return self.outputSize
@@ -161,7 +162,7 @@ class MobileNetV2Block(nn.Module):
 
         self.downSample = downSample
         self.shortcut = (not downSample) and (inputChannels == outputChannels)
-        self.imageDims = imageDims
+        self.imageDims = [*imageDims]
 
         internalChannels = inputChannels * expansionFactor
 
@@ -186,7 +187,7 @@ class MobileNetV2Block(nn.Module):
             return y
 
     def getComputeCost(self):
-        hiddenDims = self.imageDims
+        hiddenDims = [*self.imageDims]
         if self.downSample:
             hiddenDims[0] /= 2
             hiddenDims[1] /= 2
@@ -198,6 +199,8 @@ class MobileNetV2Block(nn.Module):
 class MobileNetV2(nn.Module):
     def __init__(self, dtype, imageDims, imageChannels, batchConfig):
         super(MobileNetV2, self).__init__()
+
+        imageDims = [*imageDims]
 
         self.conv0 = nn.Conv2d(imageChannels, 32, 3, padding=1, bias=False)
         self.bn0 = nn.BatchNorm2d(32)
@@ -259,7 +262,7 @@ class MobileNetV2Short(nn.Module):
     def __init__(self, imageDims, imageChannels, batchConfig, dtype):
         super(MobileNetV2Short, self).__init__()
 
-        self.imageDims = imageDims
+        self.imageDims = [*imageDims]
         self.imageChannels = imageChannels
 
         self.conv0 = nn.Conv2d(imageChannels, 32, 3, padding=1, bias=False)
@@ -285,11 +288,12 @@ class MobileNetV2Short(nn.Module):
             MobileNetV2Block(imageDims, 160, 320, batchConfig, dtype, downSample=False)
         ]
 
+        imageDims = [*imageDims]
         for block in self.blockList:
             if block.downSample:
                 imageDims[0] /= 2
                 imageDims[1] /= 2
-                block.imageDims = imageDims
+                block.imageDims = [*imageDims]
 
         self.blocks = nn.Sequential(*self.blockList)
 
@@ -343,7 +347,7 @@ class BYOL(nn.Module):
         # dimensions of dataView1,2: [batchSize, channelCount, imageWidth, imageHeight]
 
         # Standard BYOL approach
-        if (self.emaScheduler.getTau() != 0):
+        if self.emaScheduler.getTau() != 0:
             image1OnlineEncoded = self.onlineEncoder(dataView1)
             image1Online = self.onlineProjector(image1OnlineEncoded)
             image1Predicted = self.predictor(image1Online)
@@ -387,7 +391,7 @@ class BYOL(nn.Module):
         tau = self.emaScheduler.getTau()
 
         # Standard BYOL approach
-        if (tau != 0):
+        if tau != 0:
             for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):
                 targetParam.data = targetParam.data + (onlineParam.data - targetParam.data) * (1.0 - tau)
                 targetParam.requires_grad = False
