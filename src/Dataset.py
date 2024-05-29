@@ -8,10 +8,11 @@ class ToHalfTensor(torch.nn.Module):
 
 class Dataset:
 
-    def __init__(self, datasetName, batchSize, normalization, classificationSplit, useHalfPrecision):
+    def __init__(self, datasetName, batchSize, normalization, classificationSplit):
 
         transform = transforms.Compose([
-            ToHalfTensor() if useHalfPrecision else transforms.ToTensor(),
+            #ToHalfTensor() if useHalfPrecision else transforms.ToTensor(),
+            transforms.ToTensor(),
             transforms.Normalize(normalization[0], normalization[1])
         ])
 

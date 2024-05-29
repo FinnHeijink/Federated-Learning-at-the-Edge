@@ -34,7 +34,7 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
         if batchIndex % 10 == 0:
             print(f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxTrainBatches * 100:.1f}%: BYOLLoss={loss:.4f}")
 
-def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, epoch, maxEpochs):
+def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, epoch, maxEpochs, useHalfPrecision):
     classifier.train()
 
     print(f"Training Classifier Epoch {epoch + 1}: lr={optimizer.param_groups[0]['lr']}")
@@ -42,6 +42,9 @@ def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, e
     maxClassifierBatches = dataset.classificationBatchCount() / dataset.batchSize
     for batchIndex, (data, target) in enumerate(dataset.classificationEnumeration()):
         data, target = data.to(device), target.to(device)
+
+        if useHalfPrecision:
+            data = data.half()
 
         optimizer.zero_grad()
         loss = classifier.loss(data, target)
@@ -55,23 +58,28 @@ def TrainClassifierEpoch(classifier, device, dataset, optimizer, checkpointer, e
                 f"Epoch {epoch + 1}, batch {batchIndex}/{batchIndex / maxClassifierBatches * 100:.1f}%: classificationLoss={loss:.2f}")
 
 
-def TestEpoch(classifier, device, dataset):
+def TestEpoch(classifier, device, dataset, useHalfPrecision):
     classifier.eval() # Disable dropout
 
     testLoss = 0
     accuracy = 0
+    batchCount = 0
     with torch.no_grad():
         for batchIndex, (data, target) in enumerate(dataset.testingEnumeration()):
             data, target = data.to(device), target.to(device)
+
+            if useHalfPrecision:
+                data = data.half()
+
             loss, output, prediction = classifier.predictionLoss(data, target)
 
             testLoss += loss.item()
             accuracy += prediction.eq(target.view_as(prediction)).sum().item() / len(data)
 
-    maxBatches = dataset.testBatchCount() / dataset.batchSize
+            batchCount += 1
 
-    testLoss /= maxBatches
-    accuracy /= maxBatches
+    testLoss /= batchCount
+    accuracy /= batchCount
 
     print(f"Evaluation: loss={testLoss:2f}, accuracy={accuracy * 100:.1f}%")
 
@@ -149,18 +157,15 @@ def main():
                 TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, byolCheckpointer, epoch, config["training"]["epochs"])
                 classifier.copyEncoderFromBYOL(byol)
                 for i in range(config["training"]["classifierEpochs"]):
-                    TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["epochs"])
+                    TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["epochs"], config["useHalfPrecision"])
 
                 if epoch % config["training"]["evaluateEveryNEpochs"] == 0:
-                    testResults = TestEpoch(classifier, device, dataset)
+                    testResults = TestEpoch(classifier, device, dataset, config["useHalfPrecision"])
                     statistics.append((*testResults, epoch))
 
                 lrScheduler.step()
                 classifierOptimizer.param_groups[0]["lr"] = byolOptimizer.param_groups[0]["lr"]
                 emaScheduler.step(epoch)
-
-                #byolCheckpointer.saveCheckpoint(byol, byolOptimizer)
-                #byolCheckpointer.loadCheckpoint(None, byol, byolOptimizer)
         except KeyboardInterrupt:
             pass
 
@@ -174,7 +179,7 @@ def main():
         if config["loadFromCheckpoint"]:
             classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, None)
 
-        TestEpoch(classifier, device, dataset)
+        TestEpoch(classifier, device, dataset, config["useHalfPrecision"])
     elif config["mode"] == "evaltrain" or config["mode"] == "evaltrainfrombyol":
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
 
@@ -188,16 +193,16 @@ def main():
             if config["loadFromCheckpoint"]:
                 startEpoch = classifierCheckpointer.loadCheckpoint(config["loadFromSpecificCheckpoint"], classifier, classifierOptimizer)
 
-        lrScheduler = Util.WarmupCosineScheduler(classifierOptimizer, config["dataset"]["batchSize"], startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
+        lrScheduler = Util.WarmupCosineScheduler(classifierOptimizer, startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
 
         statistics = []
 
         try:
             for epoch in range(startEpoch, config["training"]["classifierEpochs"]):
-                TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["classifierEpochs"])
+                TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["classifierEpochs"], config["useHalfPrecision"])
 
                 if epoch % config["training"]["evaluateEveryNEpochs"] == 0:
-                    testResults = TestEpoch(classifier, device, dataset)
+                    testResults = TestEpoch(classifier, device, dataset, config["useHalfPrecision"])
                     statistics.append((*testResults, epoch))
 
             lrScheduler.step()

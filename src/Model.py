@@ -18,7 +18,7 @@ def GetLinearComputeCost(inputSize, outputSize, bias):
 def GetConvolutionalComputeCost(inputDims, inputChannels, outputChannels, kernelSize, stride=1):
     perPixel = np.array((kernelSize ** 2, kernelSize ** 2 + 1))
 
-    pixels = (inputDims[0] - (kernelSize - 1) / 2)/stride * (inputDims[1] - (kernelSize - 1) / 2)/stride
+    pixels = (inputDims[0] - (kernelSize - 1))/stride * (inputDims[1] - (kernelSize - 1))/stride
 
     totalMA = perPixel * pixels * inputChannels * outputChannels
     params = kernelSize ** 2 * inputChannels * outputChannels
