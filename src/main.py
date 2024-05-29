@@ -159,8 +159,8 @@ def main():
                 classifierOptimizer.param_groups[0]["lr"] = byolOptimizer.param_groups[0]["lr"]
                 emaScheduler.step(epoch)
 
-                byolCheckpointer.saveCheckpoint(byol, byolOptimizer)
-                byolCheckpointer.loadCheckpoint(None, byol, byolOptimizer)
+                #byolCheckpointer.saveCheckpoint(byol, byolOptimizer)
+                #byolCheckpointer.loadCheckpoint(None, byol, byolOptimizer)
         except KeyboardInterrupt:
             pass
 

@@ -68,7 +68,10 @@ class EMAScheduler:
         if not self.enableSchedule:
             return
 
-        self.tau = 1 - (1 - self.initialTau) * 0.5 * (1 + math.cos(math.pi * currentEpoch / self.epochCount))
+        if self.initialTau == 0:
+            self.tau = 0 # SimSiam
+        else:
+            self.tau = 1 - (1 - self.initialTau) * 0.5 * (1 + math.cos(math.pi * currentEpoch / self.epochCount))
 
     def startStep(self, steps):
         for i in range(steps):
