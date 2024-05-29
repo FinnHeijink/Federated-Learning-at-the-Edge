@@ -16,19 +16,19 @@ def GetConfig():
         ),
 
         training=dict(
-            epochs=75,
+            epochs=100,
             warmupEpochs=10,
-            evaluateEveryNEpochs=5,
+            evaluateEveryNEpochs=1,
             classifierEpochs=1,
         ),
         dataset=dict(
-            datasetName="MNIST",
+            datasetName="FashionMNIST",
             normalization=None, #autoset
-            batchSize=32,
+            batchSize=128,
             classificationSplit=0.1,
         ),
         EMA=dict(
-            initialTau=0,
+            initialTau=0.0,
             epochCount=None, #autoset
             enableSchedule=True
         ),
@@ -121,6 +121,12 @@ def GetConfig():
         config["dataset"]["normalization"] = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
         config["BYOL"]["encoder"]["imageDims"] = (32, 32)
         config["BYOL"]["encoder"]["imageChannels"] = 3
+        config["classifier"]["classCount"] = 10
+    elif config["dataset"]["datasetName"] == "FashionMNIST":
+        config["augmenter"]["imageDims"] = (28, 28)
+        config["dataset"]["normalization"] = ((0.1307,), (0.3081,))
+        config["BYOL"]["encoder"]["imageDims"] = (28, 28)
+        config["BYOL"]["encoder"]["imageChannels"] = 1
         config["classifier"]["classCount"] = 10
     else:
         raise NotImplementedError
