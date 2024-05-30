@@ -22,9 +22,9 @@ def GetConfig():
             classifierEpochs=1,
         ),
         dataset=dict(
-            datasetName="FashionMNIST",
+            datasetName="MNIST",
             normalization=None, #autoset
-            batchSize=128,
+            batchSize=32,
             classificationSplit=0.1,
         ),
         EMA=dict(
@@ -101,12 +101,12 @@ def GetConfig():
     config["classifier"]["encoderName"] = config["BYOL"]["encoderName"]
     config["dataBuffer"]["batchSize"] = config["dataset"]["batchSize"]
     config["EMA"]["epochCount"] = config["training"]["epochs"]
-    config["dataset"]["useHalfPrecision"] = config["useHalfPrecision"]
+    config["augmenter"]["useHalfPrecision"] = config["useHalfPrecision"]
 
     config["optimizer"]["settings"]["lr"] = config["optimizer"]["settings"]["lr"] * config["dataset"]["batchSize"] / 32
 
     if config["EMA"]["initialTau"] > 0.01: # Tau=0 means EMA disabled, so don't scale it.
-        config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (32 / config["dataset"]["batchSize"])
+        config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (config["dataset"]["batchSize"] / 32)
 
     if config["dataset"]["datasetName"] == "MNIST":
         config["augmenter"]["imageDims"] = (28, 28)

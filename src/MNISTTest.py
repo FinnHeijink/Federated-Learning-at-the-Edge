@@ -49,27 +49,32 @@ def test(model, device, testLoader):
     testLoss = 0
     accuracy = 0
 
+    batchCount = 0
+
     with torch.no_grad():
         for data, target in testLoader:
             data, target = data.to(device), target.to(device)
             output = model(data)
             testLoss += nll_loss(output, target, reduction='sum').item()
             prediction = output.argmax(dim=1, keepdim=True)
-            accuracy += prediction.eq(target.view_as(prediction)).sum().item()
+            accuracy += prediction.eq(target.view_as(prediction)).sum().item()/len(data)
+            batchCount += 1
 
-    testLoss /= len(testLoader.dataset)
-    accuracy /= len(testLoader.dataset)
+    testLoss /= batchCount
+    accuracy /= batchCount
 
     print(f"Evaluation: loss={testLoss:2f}, accuracy={accuracy*100:.1f}%")
 
 def main():
     torch.manual_seed(0)
-    device = torch.device("cpu")
+    device = torch.device("cuda")
 
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
 
     dsTrain = datasets.MNIST('datasets', train=True, download=True, transform=transform)
     dsTest = datasets.MNIST('datasets', train=False, transform=transform)
+    dsTrain.data.to(device)
+    dsTrain.targets.to(device)
 
     trainLoader = torch.utils.data.DataLoader(dsTrain, batch_size=batchSize)
     testLoader = torch.utils.data.DataLoader(dsTest, batch_size=batchSize)
