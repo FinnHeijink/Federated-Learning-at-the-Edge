@@ -343,6 +343,9 @@ class BYOL(nn.Module):
             targetParam.requires_grad = False
             targetParam.data = onlineParam.data
 
+        if self.emaScheduler.getTau() == 0:
+            print("Using SimSiam")
+
     def forward(self, dataView1, dataView2):
         # dimensions of dataView1,2: [batchSize, channelCount, imageWidth, imageHeight]
 
