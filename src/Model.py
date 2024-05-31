@@ -137,6 +137,9 @@ class GenericEncoder(nn.Module):
             sequence.append(nn.Conv2d(lastChannelCount, channel, 3, 1, dtype=dtype))
             if self.quantizationEnabled:
                 sequence.append(QNN.QuantizeModel())
+            sequence.append(nn.BatchNorm2d(**batchConfig))
+            if self.quantizationEnabled:
+                sequence.append(QNN.QuantizeModel())
             sequence.append(nn.ReLU())
 
             computeCost += GetConvolutionalComputeCost(currentImageDims, lastChannelCount, channel, 3)
