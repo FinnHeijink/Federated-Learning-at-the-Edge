@@ -72,7 +72,8 @@ def GetConfig():
         ),
         quantization = dict(
             enabled=True,
-            nb=12
+            nb=12,
+            nf=4
         ),
         checkpointer=dict(
             directory="src/checkpoints",
