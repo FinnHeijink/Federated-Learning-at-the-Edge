@@ -125,9 +125,11 @@ def ParseArgs(config):
 def main():
     config = Config.GetConfig()
     ParseArgs(config)
+    Config.DoPostConfig(config)
 
     torch.manual_seed(0)
     device = Util.GetDeviceFromConfig(config)
+    statistics = []
 
     dataset = Dataset.Dataset(**config["dataset"])
     emaScheduler = Util.EMAScheduler(**config["EMA"])
@@ -150,8 +152,6 @@ def main():
 
         augmenter = ImageAugmenter.ImageAugmenter(**config["augmenter"])
 
-        statistics = []
-
         try:
             for epoch in range(startEpoch, config["training"]["epochs"]):
                 TrainBYOLEpoch(byol, device, dataset, byolOptimizer, augmenter, byolCheckpointer, epoch, config["training"]["epochs"])
@@ -159,7 +159,7 @@ def main():
                 for i in range(config["training"]["classifierEpochs"]):
                     TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["epochs"], config["useHalfPrecision"])
 
-                if epoch % config["training"]["evaluateEveryNEpochs"] == 0:
+                if config["training"]["evaluateEveryNEpochs"] != 0 and epoch % config["training"]["evaluateEveryNEpochs"] == 0:
                     testResults = TestEpoch(classifier, device, dataset, config["useHalfPrecision"])
                     statistics.append((*testResults, epoch))
 
@@ -168,12 +168,6 @@ def main():
                 emaScheduler.step(epoch)
         except KeyboardInterrupt:
             pass
-
-        if len(statistics):
-            if config["printStatistics"]:
-                Util.PlotStatistics(statistics)
-
-            print("Final accuracy:", statistics[-1][1])
 
     elif config["mode"] == "eval":
         if config["loadFromCheckpoint"]:
@@ -195,25 +189,35 @@ def main():
 
         lrScheduler = Util.WarmupCosineScheduler(classifierOptimizer, startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
 
-        statistics = []
-
         try:
             for epoch in range(startEpoch, config["training"]["classifierEpochs"]):
                 TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["classifierEpochs"], config["useHalfPrecision"])
 
-                if epoch % config["training"]["evaluateEveryNEpochs"] == 0:
+                if config["training"]["evaluateEveryNEpochs"] != 0 and epoch % config["training"]["evaluateEveryNEpochs"] == 0:
                     testResults = TestEpoch(classifier, device, dataset, config["useHalfPrecision"])
                     statistics.append((*testResults, epoch))
 
             lrScheduler.step()
         except KeyboardInterrupt:
             pass
+    elif config["mode"] == "classtrain":
+        classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
 
-        if len(statistics):
-            if config["printStatistics"]:
-                Util.PlotStatistics(statistics)
+        startEpoch = 0
+        lrScheduler = Util.WarmupCosineScheduler(classifierOptimizer, startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
+        classifier.setAllowTrainingEncoder()
 
-            print("Final accuracy:", statistics[-1][1])
+        try:
+            for epoch in range(startEpoch, config["training"]["classifierEpochs"]):
+                TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, epoch, config["training"]["classifierEpochs"], config["useHalfPrecision"])
+
+                if config["training"]["evaluateEveryNEpochs"] != 0 and epoch % config["training"]["evaluateEveryNEpochs"] == 0:
+                    testResults = TestEpoch(classifier, device, dataset, config["useHalfPrecision"])
+                    statistics.append((*testResults, epoch))
+
+            lrScheduler.step()
+        except KeyboardInterrupt:
+            pass
     else:
         raise NotImplementedError
 
@@ -222,6 +226,12 @@ def main():
         print("Multiplies:", computeCost[0])
         print("Adds:", computeCost[1])
         print("Memory:", computeCost[2] * (2 if config["useHalfPrecision"] else 4))
+
+    if len(statistics):
+        if config["printStatistics"]:
+            Util.PlotStatistics(statistics)
+
+        print("Final accuracy:", statistics[-1][1])
 
 if __name__ == "__main__":
     main()

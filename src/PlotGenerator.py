@@ -2,7 +2,7 @@ import MainWrapped
 import numpy as np
 import matplotlib.pyplot as plt
 
-defaultCmdline = ["src\\RunMainWrapped.bat", "--mode=pretrain", "--loadFromCheckpoint=false", "--printStatistics=false",
+defaultCmdline = ["--mode=pretrain", "--loadFromCheckpoint=false", "--printStatistics=false",
            "--training.epochs=50", "--training.classifierEpochs=1", "--dataset.classificationSplit=0.1",
            "--training.evaluateEveryNEpochs=5", "--training.warmupEpochs=5", "--EMA.enableSchedule=True"]
 

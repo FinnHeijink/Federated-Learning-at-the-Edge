@@ -88,10 +88,23 @@ class Classifier(nn.Module):
         for param in self.encoder.parameters():
             param.requires_grad = False
 
+        self.allowTrainingEncoder = False
+
+    def setAllowTrainingEncoder(self):
+        for param in self.encoder.parameters():
+            param.requires_grad = True
+
+        self.allowTrainingEncoder = True
+
     def forward(self, x):
-        with torch.no_grad():
+
+        if self.allowTrainingEncoder:
             x = QNN.quantize(x)
-            encoded = self.encoder(x).detach()
+            encoded = self.encoder(x)
+        else:
+            with torch.no_grad():
+                x = QNN.quantize(x)
+                encoded = self.encoder(x).detach()
 
         return log_softmax(self.outputLayer(encoded), dim=1)
 
