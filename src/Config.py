@@ -7,7 +7,7 @@ def GetConfig():
         loadFromCheckpoint=True,
         loadFromSpecificCheckpoint=None,
         printStatistics=True,
-        useHalfPrecision=False,
+        useHalfPrecision=True,
 
         augmenter=dict(
             imageDims=(0, 0), #autoset
@@ -22,7 +22,7 @@ def GetConfig():
             classifierEpochs=1,
         ),
         dataset=dict(
-            datasetName="MNIST",
+            datasetName="CIFAR10",
             normalization=None, #autoset
             batchSize=32,
             classificationSplit=0.1,
@@ -73,7 +73,7 @@ def GetConfig():
         quantization = dict(
             enabled=True,
             nb=12,
-            nf=4
+            nf=7
         ),
         checkpointer=dict(
             directory="src/checkpoints",
@@ -98,6 +98,11 @@ def GetConfig():
         )
     )
 
+    DoPostConfig(config)
+
+    return config
+
+def DoPostConfig(config):
     config["BYOL"]["batchNorm"] = config["batchNorm"]
     config["BYOL"]["dtypeName"] = "float16" if config["useHalfPrecision"] else "float32"
     config["BYOL"]["quantization"] = config["quantization"]
@@ -112,7 +117,7 @@ def GetConfig():
 
     config["optimizer"]["settings"]["lr"] = config["optimizer"]["settings"]["lr"] * config["dataset"]["batchSize"] / 32
 
-    if config["EMA"]["initialTau"] > 0.01: # Tau=0 means EMA disabled, so don't scale it.
+    if config["EMA"]["initialTau"] > 0.01:  # Tau=0 means EMA disabled, so don't scale it.
         config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (config["dataset"]["batchSize"] / 32)
 
     if config["dataset"]["datasetName"] == "MNIST":
@@ -137,5 +142,3 @@ def GetConfig():
         config["classifier"]["classCount"] = 10
     else:
         raise NotImplementedError
-
-    return config
