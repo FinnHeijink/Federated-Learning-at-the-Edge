@@ -4,7 +4,7 @@ def GetConfig():
     config = dict(
         device="cuda",
         mode="pretrain",
-        loadFromCheckpoint=True,
+        loadFromCheckpoint=False,
         loadFromSpecificCheckpoint=None,
         printStatistics=True,
         useHalfPrecision=False,
@@ -20,6 +20,7 @@ def GetConfig():
             warmupEpochs=10,
             evaluateEveryNEpochs=1,
             classifierEpochs=1,
+            finalclassifierEpochs=10,
         ),
         dataset=dict(
             datasetName="MNIST",
