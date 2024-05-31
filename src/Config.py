@@ -134,6 +134,12 @@ def GetConfig():
         config["BYOL"]["encoder"]["imageDims"] = (28, 28)
         config["BYOL"]["encoder"]["imageChannels"] = 1
         config["classifier"]["classCount"] = 10
+    elif config["dataset"]["datasetName"] == "EMNIST":
+        config["augmenter"]["imageDims"] = (28, 28)
+        config["dataset"]["normalization"] = ((0.1307,), (0.3081,))
+        config["BYOL"]["encoder"]["imageDims"] = (28, 28)
+        config["BYOL"]["encoder"]["imageChannels"] = 1
+        config["classifier"]["classCount"] = 47
     else:
         raise NotImplementedError
 
