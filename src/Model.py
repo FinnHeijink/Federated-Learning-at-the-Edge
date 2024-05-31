@@ -137,7 +137,7 @@ class GenericEncoder(nn.Module):
             sequence.append(nn.Conv2d(lastChannelCount, channel, 3, 1, dtype=dtype))
             if self.quantizationEnabled:
                 sequence.append(QNN.QuantizeModel())
-            sequence.append(nn.BatchNorm2d(**batchConfig))
+            sequence.append(nn.BatchNorm2d(channel, **batchConfig))
             if self.quantizationEnabled:
                 sequence.append(QNN.QuantizeModel())
             sequence.append(nn.ReLU())
@@ -400,8 +400,9 @@ class BYOL(nn.Module):
         # dimensions of dataView1,2: [batchSize, channelCount, imageWidth, imageHeight]
 
         if self.quantizationEnabled:
-            dataView1 = QNN.quantize(dataView1)
-            dataView2 = QNN.quantize(dataView2)
+            with torch.no_grad():
+                dataView1 = QNN.quantize(dataView1)
+                dataView2 = QNN.quantize(dataView2)
 
         # Standard BYOL approach
         if self.emaScheduler.getTau() != 0:
