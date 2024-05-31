@@ -16,8 +16,12 @@ class Dataset:
             transforms.Normalize(normalization[0], normalization[1])
         ])
 
-        self.train = getattr(datasets, datasetName)('datasets', train=True, download=True, transform=transform)
-        self.test = getattr(datasets, datasetName)('datasets', train=False, transform=transform)
+        if (datasetName == 'EMNIST'):
+            self.train = getattr(datasets, datasetName)('datasets', train=True, download=True,split='balanced', transform=transform)
+            self.test = getattr(datasets, datasetName)('datasets', train=False, split='balanced', transform=transform)
+        else:
+            self.train = getattr(datasets, datasetName)('datasets', train=True, download=True, transform=transform)
+            self.test = getattr(datasets, datasetName)('datasets', train=False, transform=transform)
 
         self.train, self.classification = torch.utils.data.random_split(self.train, [1 - classificationSplit, classificationSplit])
 
