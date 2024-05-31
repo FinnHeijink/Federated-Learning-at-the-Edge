@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from torch.autograd import Function
 
 
-def quant(W, nb):
+def quant_one(W, nb):
     if nb == 1:
         return (W >= 0).float() * 2 - 1
     elif nb == 2:
@@ -23,6 +23,18 @@ def quant(W, nb):
     m = pow(2, non_sign_bits)
     return torch.clamp(torch.round(W * m), -m, m - 1) / m
 
+def quant_fraction(W, nb, nfract):
+    if nb == 1:
+        return (W >= 0).float() * 2 - 1
+    elif nb == 2:
+        return torch.clamp(torch.round(W), -1, 1)
+
+    non_sign_bits = nb - 1
+
+    f = pow(2, nfract)
+    m = pow(2, non_sign_bits)
+
+    return torch.clamp(torch.round(W * f), -m, m - 1) / f
 
 class SurrGradSpike(torch.autograd.Function):
     """
@@ -64,10 +76,11 @@ class SurrGradSpike(torch.autograd.Function):
 
 class QuantizeTensor(torch.autograd.Function):
     nb = 8
+    nf = 4
 
     @staticmethod
     def forward(ctx, input):
-        return quant(input, QuantizeTensor.nb)
+        return quant_fraction(input, QuantizeTensor.nb, QuantizeTensor.nf)
 
     @staticmethod
     def backward(ctx, grad_output):

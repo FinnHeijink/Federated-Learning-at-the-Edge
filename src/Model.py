@@ -78,6 +78,8 @@ class Classifier(nn.Module):
         dtype = getattr(torch, dtypeName)
 
         QNN.QuantizeTensor.nb = quantization["nb"]
+        QNN.QuantizeTensor.nf = quantization["nf"]
+        self.quantizationEnabled = quantization["enabled"]
 
         self.encoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, quantization=quantization, **encoder)
         self.outputLayer = MLP(self.encoder.getOutputSize(), hiddenSize, classCount, batchNorm=batchNorm, dtype=dtype, quantization=quantization)
@@ -88,6 +90,7 @@ class Classifier(nn.Module):
 
     def forward(self, x):
         with torch.no_grad():
+            x = QNN.quantize(x)
             encoded = self.encoder(x).detach()
 
         return log_softmax(self.outputLayer(encoded), dim=1)
@@ -373,6 +376,8 @@ class BYOL(nn.Module):
         dtype = getattr(torch, dtypeName)
 
         QNN.QuantizeTensor.nb = quantization["nb"]
+        QNN.QuantizeTensor.nf = quantization["nf"]
+        self.quantizationEnabled = quantization["enabled"]
 
         self.onlineEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, quantization=quantization, **encoder)
         self.targetEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, quantization=quantization, **encoder)
@@ -390,6 +395,10 @@ class BYOL(nn.Module):
 
     def forward(self, dataView1, dataView2):
         # dimensions of dataView1,2: [batchSize, channelCount, imageWidth, imageHeight]
+
+        if self.quantizationEnabled:
+            dataView1 = QNN.quantize(dataView1)
+            dataView2 = QNN.quantize(dataView2)
 
         # Standard BYOL approach
         if self.emaScheduler.getTau() != 0:
