@@ -72,9 +72,10 @@ def main():
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
 
     dsTrain = datasets.MNIST('datasets', train=True, download=True, transform=transform)
+    dsTrain, _ = torch.utils.data.random_split(dsTrain, [0.1, 0.9])
     dsTest = datasets.MNIST('datasets', train=False, transform=transform)
-    dsTrain.data.to(device)
-    dsTrain.targets.to(device)
+    #dsTrain.data.to(device)
+    #dsTrain.targets.to(device)
 
     trainLoader = torch.utils.data.DataLoader(dsTrain, batch_size=batchSize)
     testLoader = torch.utils.data.DataLoader(dsTest, batch_size=batchSize)

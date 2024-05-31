@@ -6,6 +6,8 @@ import torch.nn as nn
 from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss, normalize, relu6, adaptive_avg_pool2d
 from itertools import chain
 
+import QNN
+
 def GetLinearComputeCost(inputSize, outputSize, bias):
     if bias:
         inputSize += 1
@@ -28,18 +30,31 @@ def GetBatchNormComputeCost(size):
     return np.array((0, 0, 0))
 
 class MLP(nn.Module):
-    def __init__(self, inputSize, hiddenSize, outputSize, batchNorm, dtype):
+    def __init__(self, inputSize, hiddenSize, outputSize, batchNorm, dtype, quantization):
         super(MLP, self).__init__()
+
         self.hiddenLayer = nn.Linear(inputSize, hiddenSize, bias=True, dtype=dtype)
         self.outputLayer = nn.Linear(hiddenSize, outputSize, bias=False, dtype=dtype)
         self.batchNorm = nn.BatchNorm1d(hiddenSize, **batchNorm)
+
+        self.quantizationEnabled = quantization["enabled"]
 
         self.inputSize = inputSize
         self.hiddenSize = hiddenSize
         self.outputSize = outputSize
 
     def forward(self, x):
-        return self.outputLayer(relu(self.batchNorm(self.hiddenLayer(x)), inplace=True))
+        x = self.hiddenLayer(x)
+        if self.quantizationEnabled:
+            x = QNN.quantize(x)
+        x = self.batchNorm(x)
+        if self.quantizationEnabled:
+            x = QNN.quantize(x)
+        x = relu(x, inplace=True)
+        x = self.outputLayer(x)
+        if self.quantizationEnabled:
+            x = QNN.quantize(x)
+        return x
         #return self.outputLayer(relu(self.hiddenLayer(x), inplace=True))
 
     def getOutputSize(self):
@@ -57,13 +72,15 @@ class MLP(nn.Module):
             GetBatchNormComputeCost(self.hiddenSize)
 
 class Classifier(nn.Module):
-    def __init__(self, classCount, hiddenSize, encoder, encoderName, batchNorm, dtypeName):
+    def __init__(self, classCount, hiddenSize, encoder, encoderName, batchNorm, dtypeName, quantization):
         super(Classifier, self).__init__()
 
         dtype = getattr(torch, dtypeName)
 
-        self.encoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, **encoder)
-        self.outputLayer = MLP(self.encoder.getOutputSize(), hiddenSize, classCount, batchNorm=batchNorm, dtype=dtype)
+        QNN.QuantizeTensor.nb = quantization["nb"]
+
+        self.encoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, quantization=quantization, **encoder)
+        self.outputLayer = MLP(self.encoder.getOutputSize(), hiddenSize, classCount, batchNorm=batchNorm, dtype=dtype, quantization=quantization)
         #self.outputLayer = nn.Linear(self.encoder.getOutputSize(), classCount, dtype=dtype)
 
         for param in self.encoder.parameters():
@@ -100,11 +117,13 @@ class Classifier(nn.Module):
         return self.encoder.getComputeCost() + self.outputLayer.getComputeCost()
 
 class GenericEncoder(nn.Module):
-    def __init__(self, imageDims, imageChannels, batchConfig, dtype, channels):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, quantization, channels):
         super(GenericEncoder, self).__init__()
 
         self.imageDims = imageDims
         self.channels = channels
+
+        self.quantizationEnabled = quantization["enabled"]
 
         sequence = []
         lastChannelCount = imageChannels
@@ -113,6 +132,8 @@ class GenericEncoder(nn.Module):
 
         for channel in channels:
             sequence.append(nn.Conv2d(lastChannelCount, channel, 3, 1, dtype=dtype))
+            if self.quantizationEnabled:
+                sequence.append(QNN.QuantizeModel())
             sequence.append(nn.ReLU())
 
             computeCost += GetConvolutionalComputeCost(currentImageDims, lastChannelCount, channel, 3)
@@ -137,27 +158,27 @@ class GenericEncoder(nn.Module):
         return self.computeCost
 
 class Encoder(GenericEncoder):
-    def __init__(self, imageDims, imageChannels, batchConfig, dtype, outputChannels=64, hiddenChannels=32):
-        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[hiddenChannels, outputChannels])
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, quantization, outputChannels=64, hiddenChannels=32):
+        super(Encoder, self).__init__(imageDims, imageChannels, batchConfig, dtype, quantization, channels=[hiddenChannels, outputChannels])
 
 class EncoderType1(GenericEncoder):
-    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
-        super(EncoderType1, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[2, 4])
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, quantization):
+        super(EncoderType1, self).__init__(imageDims, imageChannels, batchConfig, dtype, quantization, channels=[2, 4])
 
 class EncoderType2(GenericEncoder):
-    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
-        super(EncoderType2, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[4, 8])
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, quantization):
+        super(EncoderType2, self).__init__(imageDims, imageChannels, batchConfig, dtype, quantization, channels=[4, 8])
 
 class EncoderType3(GenericEncoder):
-    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
-        super(EncoderType3, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[4, 8, 12])
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, quantization):
+        super(EncoderType3, self).__init__(imageDims, imageChannels, batchConfig, dtype, quantization, channels=[4, 8, 12])
 
 class EncoderType4(GenericEncoder):
-    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
-        super(EncoderType4, self).__init__(imageDims, imageChannels, batchConfig, dtype, channels=[6, 12, 18, 24, 30])
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, quantization):
+        super(EncoderType4, self).__init__(imageDims, imageChannels, batchConfig, dtype, quantization, channels=[6, 12, 18, 24, 30])
 
 class MobileNetV2Block(nn.Module):
-    def __init__(self, imageDims, inputChannels, outputChannels, batchConfig, dtype, expansionFactor=6, downSample=False):
+    def __init__(self, imageDims, inputChannels, outputChannels, batchConfig, dtype, quantization, expansionFactor=6, downSample=False):
         super(MobileNetV2Block, self).__init__()
 
         self.downSample = downSample
@@ -169,6 +190,8 @@ class MobileNetV2Block(nn.Module):
         self.inputChannels = inputChannels
         self.internalChannels = internalChannels
 
+        self.quantizationEnabled = quantization["enabled"]
+
         self.conv1 = nn.Conv2d(inputChannels, internalChannels, 1, bias=False, dtype=dtype)
         self.bn1 = nn.BatchNorm2d(internalChannels, **batchConfig, dtype=dtype)
         self.conv2 = nn.Conv2d(internalChannels, internalChannels, 3, stride=2 if downSample else 1, groups=internalChannels, bias=False, padding=1, dtype=dtype)
@@ -177,9 +200,26 @@ class MobileNetV2Block(nn.Module):
         self.bn3 = nn.BatchNorm2d(outputChannels, **batchConfig, dtype=dtype)
 
     def forward(self, x):
-        y = relu6(self.bn1(self.conv1(x)), inplace=True)
-        y = relu6(self.bn2(self.conv2(y)), inplace=True)
-        y = self.bn3(self.conv3(y))
+        y = self.conv1(x)
+        if self.quantizationEnabled:
+            y = QNN.quantize(y)
+        y = self.bn1(y)
+        if self.quantizationEnabled:
+            y = QNN.quantize(y)
+        y = relu6(y, inplace=True)
+        y = self.conv2(y)
+        if self.quantizationEnabled:
+            y = QNN.quantize(y)
+        y = self.bn2(y)
+        if self.quantizationEnabled:
+            y = QNN.quantize(y)
+        y = relu6(y, inplace=True)
+        y = self.conv3(y)
+        if self.quantizationEnabled:
+            y = QNN.quantize(y)
+        y = self.bn3(y)
+        if self.quantizationEnabled:
+            y = QNN.quantize(y)
 
         if self.shortcut:
             return y + x
@@ -197,7 +237,7 @@ class MobileNetV2Block(nn.Module):
             GetConvolutionalComputeCost(hiddenDims, self.internalChannels, self.outputChannels, 1)
 
 class MobileNetV2(nn.Module):
-    def __init__(self, dtype, imageDims, imageChannels, batchConfig):
+    def __init__(self, dtype, imageDims, imageChannels, batchConfig, quantization):
         super(MobileNetV2, self).__init__()
 
         imageDims = [*imageDims]
@@ -206,23 +246,23 @@ class MobileNetV2(nn.Module):
         self.bn0 = nn.BatchNorm2d(32)
 
         blocks = [
-            MobileNetV2Block(imageDims, 32, 16, batchConfig, dtype, expansionFactor=1, downSample=False),
-            MobileNetV2Block(imageDims, 16, 24, batchConfig, dtype, downSample=False),
-            MobileNetV2Block(imageDims, 24, 24, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 24, 32, batchConfig, dtype, downSample=False),
-            MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 32, 64, batchConfig, dtype, downSample=True),
-            MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 64, 96, batchConfig, dtype, downSample=False),
-            MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 96, 160, batchConfig, dtype, downSample=True),
-            MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 160, 320, batchConfig, dtype, downSample=False)
+            MobileNetV2Block(imageDims, 32, 16, batchConfig, dtype, quantization, expansionFactor=1, downSample=False),
+            MobileNetV2Block(imageDims, 16, 24, batchConfig, dtype, quantization, downSample=False),
+            MobileNetV2Block(imageDims, 24, 24, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 24, 32, batchConfig, dtype, quantization, downSample=False),
+            MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 32, 64, batchConfig, dtype, quantization, downSample=True),
+            MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 64, 96, batchConfig, dtype, quantization, downSample=False),
+            MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 96, 160, batchConfig, dtype, quantization, downSample=True),
+            MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 160, 320, batchConfig, dtype, quantization, downSample=False)
         ]
 
         for block in blocks:
@@ -259,7 +299,7 @@ class MobileNetV2(nn.Module):
         return computeCost
 
 class MobileNetV2Short(nn.Module):
-    def __init__(self, imageDims, imageChannels, batchConfig, dtype):
+    def __init__(self, imageDims, imageChannels, batchConfig, dtype, quantization):
         super(MobileNetV2Short, self).__init__()
 
         self.imageDims = [*imageDims]
@@ -269,23 +309,23 @@ class MobileNetV2Short(nn.Module):
         self.bn0 = nn.BatchNorm2d(32)
 
         self.blockList = [
-            MobileNetV2Block(imageDims, 32, 16, batchConfig, dtype, expansionFactor=1, downSample=False),
-            MobileNetV2Block(imageDims, 16, 24, batchConfig, dtype, downSample=False),
-            # MobileNetV2Block(imageDims, 24, 24, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 24, 32, batchConfig, dtype, downSample=False),
-            # MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype),
-            # MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 32, 64, batchConfig, dtype, downSample=True),
-            # MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
-            # MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
-            # MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 64, 96, batchConfig, dtype, downSample=False),
-            # MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype),
-            # MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 96, 160, batchConfig, dtype, downSample=True),
-            # MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype),
-            # MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype),
-            MobileNetV2Block(imageDims, 160, 320, batchConfig, dtype, downSample=False)
+            MobileNetV2Block(imageDims, 32, 16, batchConfig, dtype, quantization, expansionFactor=1, downSample=False),
+            MobileNetV2Block(imageDims, 16, 24, batchConfig, dtype, quantization, downSample=False),
+            # MobileNetV2Block(imageDims, 24, 24, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 24, 32, batchConfig, dtype, quantization, downSample=False),
+            # MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype, quantization),
+            # MobileNetV2Block(imageDims, 32, 32, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 32, 64, batchConfig, dtype, quantization, downSample=True),
+            # MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype, quantization),
+            # MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype, quantization),
+            # MobileNetV2Block(imageDims, 64, 64, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 64, 96, batchConfig, dtype, quantization, downSample=False),
+            # MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype, quantization),
+            # MobileNetV2Block(imageDims, 96, 96, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 96, 160, batchConfig, dtype, quantization, downSample=True),
+            # MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype, quantization),
+            # MobileNetV2Block(imageDims, 160, 160, batchConfig, dtype, quantization),
+            MobileNetV2Block(imageDims, 160, 320, batchConfig, dtype, quantization, downSample=False)
         ]
 
         imageDims = [*imageDims]
@@ -325,18 +365,20 @@ class MobileNetV2Short(nn.Module):
         return computeCost
 
 class BYOL(nn.Module):
-    def __init__(self, emaScheduler, encoderName, predictor, projector, encoder, batchNorm, dtypeName):
+    def __init__(self, emaScheduler, encoderName, predictor, projector, encoder, batchNorm, dtypeName, quantization):
         super(BYOL, self).__init__()
 
         self.emaScheduler = emaScheduler
 
         dtype = getattr(torch, dtypeName)
 
-        self.onlineEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, **encoder)
-        self.targetEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, **encoder)
-        self.onlineProjector = MLP(dtype=dtype, inputSize=self.onlineEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
-        self.targetProjector = MLP(dtype=dtype, inputSize=self.targetEncoder.getOutputSize(), batchNorm=batchNorm, **projector)
-        self.predictor = MLP(dtype=dtype, inputSize=self.onlineProjector.getOutputSize(), outputSize=self.targetProjector.getOutputSize(), batchNorm=batchNorm, **predictor)
+        QNN.QuantizeTensor.nb = quantization["nb"]
+
+        self.onlineEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, quantization=quantization, **encoder)
+        self.targetEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, quantization=quantization, **encoder)
+        self.onlineProjector = MLP(dtype=dtype, inputSize=self.onlineEncoder.getOutputSize(), batchNorm=batchNorm, quantization=quantization, **projector)
+        self.targetProjector = MLP(dtype=dtype, inputSize=self.targetEncoder.getOutputSize(), batchNorm=batchNorm, quantization=quantization, **projector)
+        self.predictor = MLP(dtype=dtype, inputSize=self.onlineProjector.getOutputSize(), outputSize=self.targetProjector.getOutputSize(), batchNorm=batchNorm, quantization=quantization, **predictor)
 
         # Make sure the target network starts out the same as the online network
         for onlineParam, targetParam in zip(self.onlineParameters(), self.targetParameters()):

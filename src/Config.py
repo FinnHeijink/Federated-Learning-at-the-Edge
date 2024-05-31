@@ -4,7 +4,7 @@ def GetConfig():
     config = dict(
         device="cuda",
         mode="pretrain",
-        loadFromCheckpoint=False,
+        loadFromCheckpoint=True,
         loadFromSpecificCheckpoint=None,
         printStatistics=True,
         useHalfPrecision=False,
@@ -28,7 +28,7 @@ def GetConfig():
             classificationSplit=0.1,
         ),
         EMA=dict(
-            initialTau=0.0,
+            initialTau=0.9,
             epochCount=None, #autoset
             enableSchedule=True
         ),
@@ -70,6 +70,10 @@ def GetConfig():
             eps=1e-5,
             momentum=0.1
         ),
+        quantization = dict(
+            enabled=True,
+            nb=12
+        ),
         checkpointer=dict(
             directory="src/checkpoints",
             #checkpointMode=Checkpointer.CheckpointMode.EVERY_N_SECS,
@@ -95,10 +99,12 @@ def GetConfig():
 
     config["BYOL"]["batchNorm"] = config["batchNorm"]
     config["BYOL"]["dtypeName"] = "float16" if config["useHalfPrecision"] else "float32"
+    config["BYOL"]["quantization"] = config["quantization"]
     config["classifier"]["dtypeName"] = "float16" if config["useHalfPrecision"] else "float32"
     config["classifier"]["batchNorm"] = config["batchNorm"]
     config["classifier"]["encoder"] = config["BYOL"]["encoder"]
     config["classifier"]["encoderName"] = config["BYOL"]["encoderName"]
+    config["classifier"]["quantization"] = config["quantization"]
     config["dataBuffer"]["batchSize"] = config["dataset"]["batchSize"]
     config["EMA"]["epochCount"] = config["training"]["epochs"]
     config["augmenter"]["useHalfPrecision"] = config["useHalfPrecision"]
