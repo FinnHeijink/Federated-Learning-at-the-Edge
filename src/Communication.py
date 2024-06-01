@@ -1,4 +1,6 @@
 import socket
+import time
+
 import select
 import torch
 import struct
@@ -80,12 +82,15 @@ class Communication:
         read_sockets, write_sockets, error_sockets = select.select([self.socket], [], [], 0)
         return len(read_sockets) == 1
 
-def recvall(socket, n):
+def recvall(socket : socket.socket, n):
     # Helper function to recv n bytes or return None if EOF is hit
     data = bytearray()
     while len(data) < n:
-        packet = socket.recv(n - len(data))
-        if not packet:
-            return None
-        data.extend(packet)
+        try:
+            packet = socket.recv(n - len(data))
+            if not packet:
+                return None
+            data.extend(packet)
+        except BlockingIOError: #No data available yet, wait a bit then try again
+            time.sleep(0.010)
     return data
