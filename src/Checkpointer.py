@@ -96,5 +96,5 @@ class Checkpointer:
     def saveCheckpoint(self, model, optimizer):
         torch.save(model.state_dict(), self.getModelCheckpointPath())
 
-        if self.saveOptimizerData:
+        if optimizer and self.saveOptimizerData:
             torch.save(optimizer.state_dict(), self.getOptimizerCheckpointPath())
