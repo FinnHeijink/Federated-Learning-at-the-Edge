@@ -207,11 +207,11 @@ def main():
         except KeyboardInterrupt:
             pass
     elif config["mode"] == "classtrain":
+        classifier.setAllowTrainingEncoder() #Before classifier.trainableParameters()
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
 
         startEpoch = 0
         lrScheduler = Util.WarmupCosineScheduler(classifierOptimizer, startEpoch, config["training"]["epochs"], config["training"]["warmupEpochs"], config["optimizer"]["settings"]["lr"])
-        classifier.setAllowTrainingEncoder()
 
         try:
             for epoch in range(startEpoch, config["training"]["classifierEpochs"]):

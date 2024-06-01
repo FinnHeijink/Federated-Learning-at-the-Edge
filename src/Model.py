@@ -99,11 +99,13 @@ class Classifier(nn.Module):
     def forward(self, x):
 
         if self.allowTrainingEncoder:
-            x = QNN.quantize(x)
+            if self.quantizationEnabled:
+                x = QNN.quantize(x)
             encoded = self.encoder(x)
         else:
             with torch.no_grad():
-                x = QNN.quantize(x)
+                if self.quantizationEnabled:
+                    x = QNN.quantize(x)
                 encoded = self.encoder(x).detach()
 
         return log_softmax(self.outputLayer(encoded), dim=1)
@@ -127,7 +129,10 @@ class Classifier(nn.Module):
             classifierParam.data = onlineParam.data
 
     def trainableParameters(self):
-        return self.outputLayer.parameters()
+        if self.allowTrainingEncoder:
+            return self.parameters()
+        else:
+            return self.outputLayer.parameters()
 
     def getComputeCost(self):
         return self.encoder.getComputeCost() + self.outputLayer.getComputeCost()
