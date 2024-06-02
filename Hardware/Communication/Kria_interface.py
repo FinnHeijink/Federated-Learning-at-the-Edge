@@ -12,9 +12,17 @@ def float_to_int(f):
 def int_to_float(i):
     return struct.unpack('<f', struct.pack('<I', i))[0]
 
-# 2 16-bit integers -> 1 32-bit integer
-def combine_int16(a, b):
-    return (b & 0xFF) | ((a & 0xFF) << 16)
+# quantized value -> signed integer -> combine per 2
+def quan_to_int(f1, f2):
+    f1 = round(f1*(2**7))
+    if f1 <0:
+        f1 = (1<<12) + f1
+    f2 = round(f2*(2**7))
+    if f2 <0:
+        f2 = (1<<12) + f2
+    return ((f1 & 0xFFF) << 20) | ((f2 & 0xFFF) << 4)
+
+
 
 # 1 32-bit integer -> 2 16-bit integers
 def split_int16(A):
@@ -80,7 +88,7 @@ class KRIA():
         # ToDo: check if the new format is compatible with the current transfer method to int
         if quantizationEnabled:         
             for i in range(int(numParameters/2)):
-                value = combine_int16(float_to_int(parameters[i]),float_to_int(parameters[i+1]))
+                value = quan_to_int(parameters[i],[parameters[i+1]])
                 self.bram_inputs.write(offset,value)
                 offset = offset + 4
         else:
