@@ -179,7 +179,75 @@ class KRIA():
             output.extend(split_int8(self.bram_outputs.read(offset)))
             offset = offset + 4
         return output
+    # performs augmentations and convolutions on the images in the buffer with the loaded kernels
+    # outputSize: determines how many values have to be transferred back to PS
+    def HardwareAugment(self, outputSize):     
+        # give signal to start the process                      
+        self.Augment_start.write(0,1)
+        self.Augment_start.write(0,0)
 
+        # check if hardware is done with all images
+        while(self.Augment_done.read()==0):
+            pass
+
+        # read the output
+        offset = 0
+        output = []
+        for i in range(int(outputSize/4)):
+            output.extend(split_int8(self.bram_outputs.read(offset)))
+            offset = offset + 4
+        return output
+    
+    def HardwareConvolveL1(self, outputSize):     
+        # give signal to start the process                      
+        self.ConvL1_start.write(0,1)
+        self.ConvL1_start.write(0,0)
+
+        # check if hardware is done with all images
+        while(self.ConvL1_done.read()==0):
+            pass
+
+        # read the output
+        offset = 0
+        output = []
+        for i in range(int(outputSize/4)):
+            output.extend(split_int8(self.bram_outputs.read(offset)))
+            offset = offset + 4
+        return output
+    
+    def HardwareConvolveL2(self, outputSize):     
+        # give signal to start the process                      
+        self.ConvL2_start.write(0,1)
+        self.ConvL2_start.write(0,0)
+
+        # check if hardware is done with all images
+        while(self.ConvL2_done.read()==0):
+            pass
+
+        # read the output
+        offset = 0
+        output = []
+        for i in range(int(outputSize/4)):
+            output.extend(split_int8(self.bram_outputs.read(offset)))
+            offset = offset + 4
+        return output
+    
+    def HardwareConvolveL3(self, outputSize):     
+        # give signal to start the process                      
+        self.ConvL3_start.write(0,1)
+        self.ConvL3_start.write(0,0)
+
+        # check if hardware is done with all images
+        while(self.ConvL3_done.read()==0):
+            pass
+
+        # read the output
+        offset = 0
+        output = []
+        for i in range(int(outputSize/4)):
+            output.extend(split_int8(self.bram_outputs.read(offset)))
+            offset = offset + 4
+        return output
 
 
     
