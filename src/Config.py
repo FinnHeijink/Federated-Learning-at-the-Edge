@@ -119,8 +119,8 @@ def DoPostConfig(config):
 
     config["optimizer"]["settings"]["lr"] = config["optimizer"]["settings"]["lr"] * config["dataset"]["batchSize"] / 32
 
-    if config["EMA"]["initialTau"] > 0.01:  # Tau=0 means EMA disabled, so don't scale it.
-        config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (config["dataset"]["batchSize"] / 32)
+    #if config["EMA"]["initialTau"] > 0.01:  # Tau=0 means EMA disabled, so don't scale it. Otherwise, do scale.
+        #config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) ** ((config["dataset"]["batchSize"] / 32))
 
     if config["dataset"]["datasetName"] == "MNIST":
         config["augmenter"]["imageDims"] = (28, 28)
