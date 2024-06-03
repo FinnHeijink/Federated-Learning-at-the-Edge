@@ -123,7 +123,7 @@ def ParseArgs(config):
     RetrieveDict("", config)
 
 def main():
-    config = Config.GetConfig()
+    config = Config.GetConfig(doPostConfig=False)
     ParseArgs(config)
     Config.DoPostConfig(config)
 

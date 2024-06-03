@@ -1,6 +1,6 @@
 import Checkpointer
 
-def GetConfig():
+def GetConfig(doPostConfig=True):
     config = dict(
         device="cuda",
         mode="pretrain",
@@ -99,7 +99,8 @@ def GetConfig():
         )
     )
 
-    DoPostConfig(config)
+    if doPostConfig:
+        DoPostConfig(config)
 
     return config
 
