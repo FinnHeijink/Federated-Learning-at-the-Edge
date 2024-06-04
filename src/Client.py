@@ -238,6 +238,8 @@ def main():
     #torch.manual_seed(0)
     device = Util.GetDeviceFromConfig(config)
 
+    Model.SetUseReLU1(config["useReLU1"])
+
     #dataSource = DatasetDataSource(config)
     dataSource = DataBufferDataSource(config)
     client = Client(device, config, dataSource)

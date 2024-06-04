@@ -8,6 +8,7 @@ def GetConfig(doPostConfig=True):
         loadFromSpecificCheckpoint=None,
         printStatistics=True,
         useHalfPrecision=True,
+        useReLU1=True,
 
         augmenter=dict(
             imageDims=(0, 0), #autoset

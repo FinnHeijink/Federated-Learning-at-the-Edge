@@ -8,6 +8,29 @@ from itertools import chain
 
 import QNN
 
+def relu1(x, inplace=False):
+    return torch.clamp(x, 0, 1)
+
+class ReLU1(nn.Module):
+    def __init__(self):
+        super(ReLU1, self).__init__()
+
+    def forward(self, x):
+        return relu1(x)
+
+reluFunctionToUse=relu
+reluModuleToUse=nn.ReLU
+
+def SetUseReLU1(use):
+    global reluFunctionToUse
+    global reluModuleToUse
+    if use:
+        reluFunctionToUse = relu1
+        reluModuleToUse = ReLU1
+    else:
+        reluFunctionToUse = relu
+        reluModuleToUse = nn.ReLU
+
 def GetLinearComputeCost(inputSize, outputSize, bias):
     if bias:
         inputSize += 1
@@ -50,12 +73,12 @@ class MLP(nn.Module):
         x = self.batchNorm(x)
         if self.quantizationEnabled:
             x = QNN.quantize(x)
-        x = relu(x, inplace=True)
+        x = reluFunctionToUse(x, inplace=True)
         x = self.outputLayer(x)
         if self.quantizationEnabled:
             x = QNN.quantize(x)
         return x
-        #return self.outputLayer(relu(self.hiddenLayer(x), inplace=True))
+        #return self.outputLayer(reluFunctionToUse(self.hiddenLayer(x), inplace=True))
 
     def getOutputSize(self):
         return self.outputSize
@@ -158,7 +181,7 @@ class GenericEncoder(nn.Module):
             sequence.append(nn.BatchNorm2d(channel, **batchConfig))
             if self.quantizationEnabled:
                 sequence.append(QNN.QuantizeModel())
-            sequence.append(nn.ReLU())
+            sequence.append(reluModuleToUse())
 
             computeCost += GetConvolutionalComputeCost(currentImageDims, lastChannelCount, channel, 3)
 
@@ -230,14 +253,14 @@ class MobileNetV2Block(nn.Module):
         y = self.bn1(y)
         if self.quantizationEnabled:
             y = QNN.quantize(y)
-        y = relu6(y, inplace=True)
+        y = relu1(y, inplace=True)
         y = self.conv2(y)
         if self.quantizationEnabled:
             y = QNN.quantize(y)
         y = self.bn2(y)
         if self.quantizationEnabled:
             y = QNN.quantize(y)
-        y = relu6(y, inplace=True)
+        y = relu1(y, inplace=True)
         y = self.conv3(y)
         if self.quantizationEnabled:
             y = QNN.quantize(y)
@@ -305,9 +328,9 @@ class MobileNetV2(nn.Module):
         return 1280
 
     def forward(self, x):
-        y = relu6(self.bn0(self.conv0(x)))
+        y = relu1(self.bn0(self.conv0(x)))
         y = self.blocks(y)
-        y = relu6(self.bn1(self.conv1(y)))
+        y = relu1(self.bn1(self.conv1(y)))
         y = adaptive_avg_pool2d(y, 1)
         y = torch.squeeze(torch.squeeze(y, -1), -1)
         return y
@@ -371,9 +394,9 @@ class MobileNetV2Short(nn.Module):
         return 1280
 
     def forward(self, x):
-        y = relu6(self.bn0(self.conv0(x)))
+        y = relu1(self.bn0(self.conv0(x)))
         y = self.blocks(y)
-        y = relu6(self.bn1(self.conv1(y)))
+        y = relu1(self.bn1(self.conv1(y)))
         y = adaptive_avg_pool2d(y, 1)
         y = torch.squeeze(torch.squeeze(y, -1), -1)
         return y

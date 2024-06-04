@@ -124,7 +124,9 @@ def main():
     config["device"] = "cpu"
 
     torch.manual_seed(0)
-    device = torch.device(config["device"])
+    device = Util.GetDeviceFromConfig(config)
+
+    Model.SetUseReLU1(config["useReLU1"])
 
     server = Server(device, config)
     server.bind("localhost", 1234)

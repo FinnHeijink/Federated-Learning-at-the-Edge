@@ -138,6 +138,8 @@ def main():
     byolCheckpointer = Checkpointer.Checkpointer(**config["checkpointer"], prefix="BYOL")
     classifierCheckpointer = Checkpointer.Checkpointer(**config["checkpointer"], prefix="Classifier")
 
+    Model.SetUseReLU1(config["useReLU1"])
+
     if config["mode"] == "pretrain":
         byolOptimizer = getattr(optim, config["optimizer"]["name"])(byol.trainableParameters(), **config["optimizer"]["settings"])
         classifierOptimizer = getattr(optim, config["optimizer"]["name"])(classifier.trainableParameters(), **config["optimizer"]["settings"])
