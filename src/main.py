@@ -27,6 +27,7 @@ def TrainBYOLEpoch(byol, device, dataset, optimizer, augmenter, checkpointer, ep
         loss.backward()
         optimizer.step()
         byol.stepEMA()
+        byol.quantizeParameters()
 
         checkpointer.update(byol, optimizer, epoch, maxEpochs, batchIndex, maxTrainBatches)
 

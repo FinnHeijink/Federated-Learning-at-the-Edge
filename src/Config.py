@@ -73,9 +73,11 @@ def GetConfig(doPostConfig=True):
             momentum=0.1
         ),
         quantization = dict(
-            enabled=True,
-            nb=12,
-            nf=7
+            enabled=False,
+            nb=24,
+            nf=12,
+            quantizeWeights=False,
+            useCustomConv=True
         ),
         checkpointer=dict(
             directory="src/checkpoints",

@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+import QNN
+
 class FConv2D_3x3(torch.autograd.Function):
     """
     We can implement our own custom autograd Functions by subclassing
@@ -20,7 +22,11 @@ class FConv2D_3x3(torch.autograd.Function):
         """
         ctx.save_for_backward(input, weight, bias)
 
-        return F.conv2d(input, weight, bias)
+        result = QNN.quantize(F.conv2d(QNN.quantize(input), QNN.quantize(weight)))
+        reshapedBias = bias.reshape(1, bias.shape[0], 1, 1).repeat(result.shape[0], 1, result.shape[2], result.shape[3])
+        result += reshapedBias
+
+        return result
 
     @staticmethod
     @torch.autograd.function.once_differentiable

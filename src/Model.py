@@ -6,6 +6,7 @@ import torch.nn as nn
 from torch.nn.functional import relu, max_pool2d, log_softmax, nll_loss, normalize, relu6, adaptive_avg_pool2d
 from itertools import chain
 
+import KRIAInterface
 import QNN
 
 def relu1(x, inplace=False):
@@ -168,6 +169,7 @@ class GenericEncoder(nn.Module):
         self.channels = channels
 
         self.quantizationEnabled = quantization["enabled"]
+        self.useCustomConv = quantization["useCustomConv"]
 
         sequence = []
         lastChannelCount = imageChannels
@@ -175,12 +177,17 @@ class GenericEncoder(nn.Module):
         currentImageDims = list(imageDims)
 
         for channel in channels:
-            sequence.append(nn.Conv2d(lastChannelCount, channel, 3, 1, dtype=dtype))
+            if self.useCustomConv:
+                sequence.append(KRIAInterface.Conv2D_3x3(lastChannelCount, channel, dtype=dtype))
+            else:
+                sequence.append(nn.Conv2d(lastChannelCount, channel, 3, 1, dtype=dtype))
             if self.quantizationEnabled:
                 sequence.append(QNN.QuantizeModel())
+
             sequence.append(nn.BatchNorm2d(channel, **batchConfig))
             if self.quantizationEnabled:
                 sequence.append(QNN.QuantizeModel())
+
             sequence.append(reluModuleToUse())
 
             computeCost += GetConvolutionalComputeCost(currentImageDims, lastChannelCount, channel, 3)
@@ -422,6 +429,7 @@ class BYOL(nn.Module):
         QNN.QuantizeTensor.nb = quantization["nb"]
         QNN.QuantizeTensor.nf = quantization["nf"]
         self.quantizationEnabled = quantization["enabled"]
+        self.weightQuantizationEnabled = quantization["quantizeWeights"]
 
         self.onlineEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, quantization=quantization, **encoder)
         self.targetEncoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, quantization=quantization, **encoder)
@@ -532,3 +540,9 @@ class BYOL(nn.Module):
         computeCost = 2 * (self.onlineEncoder.getComputeCost() + self.onlineProjector.getComputeCost() + self.predictor.getComputeCost() + self.targetEncoder.getComputeCost() + self.targetProjector.getComputeCost())
         computeCost[2] /= 2
         return computeCost
+
+    def quantizeParameters(self):
+        if self.quantizationEnabled and self.weightQuantizationEnabled:
+            for param in self.parameters():
+                with torch.no_grad():
+                    param.data = QNN.quantize(param.data)
