@@ -106,8 +106,8 @@ class Classifier(nn.Module):
         self.quantizationEnabled = quantization["enabled"]
 
         self.encoder = globals()[encoderName](dtype=dtype, batchConfig=batchNorm, quantization=quantization, **encoder)
-        self.outputLayer = MLP(self.encoder.getOutputSize(), hiddenSize, classCount, batchNorm=batchNorm, dtype=dtype, quantization=quantization)
-        #self.outputLayer = nn.Linear(self.encoder.getOutputSize(), classCount, dtype=dtype)
+        # self.outputLayer = MLP(self.encoder.getOutputSize(), hiddenSize, classCount, batchNorm=batchNorm, dtype=dtype, quantization=quantization)
+        self.outputLayer = nn.Linear(self.encoder.getOutputSize(), classCount, dtype=dtype)
 
         for param in self.encoder.parameters():
             param.requires_grad = False

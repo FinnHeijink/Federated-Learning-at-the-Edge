@@ -24,7 +24,7 @@ def GetConfig(doPostConfig=True):
             finalclassifierEpochs=10,
         ),
         dataset=dict(
-            datasetName="CIFAR10",
+            datasetName="KMNIST",
             normalization=None, #autoset
             batchSize=32,
             classificationSplit=0.1,
@@ -142,6 +142,12 @@ def DoPostConfig(config):
     elif config["dataset"]["datasetName"] == "FashionMNIST":
         config["augmenter"]["imageDims"] = (28, 28)
         config["dataset"]["normalization"] = ((0.1307,), (0.3081,))
+        config["BYOL"]["encoder"]["imageDims"] = (28, 28)
+        config["BYOL"]["encoder"]["imageChannels"] = 1
+        config["classifier"]["classCount"] = 10
+    elif config["dataset"]["datasetName"] == "KMNIST":
+        config["augmenter"]["imageDims"] = (28, 28)
+        config["dataset"]["normalization"] = ((0.1917,), (0.3483,))
         config["BYOL"]["encoder"]["imageDims"] = (28, 28)
         config["BYOL"]["encoder"]["imageChannels"] = 1
         config["classifier"]["classCount"] = 10
