@@ -5,6 +5,7 @@ module read_module
         parameter IMAGE_ADDR = 32'hB000_0024,                                       // The base address of the BRAM for the image data    
         parameter PIXEL_SIZE = 8,                                                   // Number of bits for 1 pixel                
         parameter KERNEL_SIZE = 9,                                                  // Size of the kernel in terms of 32 bits!
+        parameter KERNEL_WIDTH = 12,
         parameter IMAGE_SIZE = 784,  //196                                           // Size of the image in terms of 8 bits!
         parameter TOT_NUM_IMAGES = 4                                                // Number of images read in a batch
         //parameter SER_NUM_IMAGES                                                  // Number of images before the address has to be reset
@@ -19,24 +20,23 @@ module read_module
 
         // Kernel 
         input logic read_kernel,                                                    // Signal from PS, read the kernel
-        output logic [KERNEL_SIZE-1:0][DATA_WIDTH-1:0] kernel,                      // Kernel register
+        output logic [KERNEL_SIZE-1:0][KERNEL_WIDTH-1:0] kernel,                    // Kernel register
         
         // Image
         input logic read_image,                                                     // Signal from PS, read the image
         output logic [PIXEL_SIZE-1:0] pixel,                                        // Pass along the read pixel to the filter
         output logic pixel_valid,                                                   // Indicate that a new pixel has been read
         
-        // Test
-        output logic [15:0][7:0] image,
-        
+      
         input logic interrupt);                                                     // Wait with passing new pixels
         
         // Internal signals
         logic [ADDR_WIDTH-1:0] next_bram_addr;                                      
         logic [KERNEL_SIZE-1:0][DATA_WIDTH-1:0] next_kernel;
         logic prev_read_kernel, prev_read_image;                     
-        integer kernel_count, next_kernel_count, pixel_count, next_pixel_count,     // Keep track of indices
-        image_count, next_image_count; 
+        logic [7:0]  kernel_count, next_kernel_count;
+        logic [7:0]  image_count, next_image_count;
+        logic [9:0]  pixel_count, next_pixel_count;
         logic [1:0]  index_count, next_index_count;
         
         typedef enum {idle, start_reading_kernel1, start_reading_kernel2, reading_kernel, start_reading_image1, start_reading_image2, reading_image, interruption} state_types;
@@ -47,7 +47,7 @@ module read_module
             if (reset) begin
                 state <= idle;
             end
-            else if (interrupt) begin
+            else if (interrupt) begin                                               // directly go to interruption state if an interruption occurs
                 state <= interruption;
             end
             else begin
@@ -56,13 +56,18 @@ module read_module
         
         // Counters
         always_ff @(posedge clk, posedge reset)
-            if (reset) begin
+            if (reset) begin                                                        // reset all counters to 0
                 kernel_count <= 0;
                 pixel_count <= 0;
                 image_count <= 0;
                 index_count <= 0;
             end
-            else begin
+            else if (interrupt) begin                                               // do not update any counters during an interruption
+                kernel_count <= kernel_count;
+                pixel_count <= pixel_count;
+                image_count <= image_count;
+                index_count <= next_index_count;
+            end else begin
                 kernel_count <= next_kernel_count;
                 pixel_count <= next_pixel_count;
                 image_count <= next_image_count;
@@ -86,7 +91,10 @@ module read_module
                 bram_addr <= 0;                                           
                 kernel <= 0;
             end
-            else begin
+            else if (interrupt) begin                                               // do not update bram_address during an interruption
+                bram_addr <= bram_addr;                                           
+                kernel <= kernel; 
+            end else begin
                 bram_addr <= next_bram_addr;                                           
                 kernel <= next_kernel;
             end
@@ -152,9 +160,10 @@ module read_module
                     pixel_valid = 1'b0;
                     
                     next_bram_addr = bram_addr + 4;                                 // Increment address                                   
-                    next_kernel[kernel_count] = bram_data;                          // Relevant index gets exchanged by data from BRAM, others stay the same
+                    next_kernel[kernel_count] = bram_data[31:20];                   // Relevant index gets exchanged by data from BRAM, others stay the same
+                    next_kernel[kernel_count+1] = bram_data[15:4];
                     
-                    next_kernel_count = kernel_count + 1;                           // Increment index of the kernel register
+                    next_kernel_count = kernel_count + 2;                           // Increment index of the kernel register
                     next_pixel_count  = 0;                                          // Image related counters stay zero
                     next_image_count  = 0;    
                     next_index_count  = 0;
@@ -176,7 +185,7 @@ module read_module
                     next_pixel_count  = 0;
                     next_image_count  = 0;    
                     
-                    next_state = start_reading_image2;                                     // Read images
+                    next_state = start_reading_image2;                              // Read images
                 end
                 
                 start_reading_image2: begin                                          // Make preparations to read the images
@@ -194,10 +203,10 @@ module read_module
                 
                 reading_image: begin                                                // Read images, change state when num of pixels has been changed
                     case (index_count) 
-                        0: begin pixel = bram_data[31:24]; image[pixel_count] = bram_data[31:24]; end
-                        1: begin pixel = bram_data[23:16]; image[pixel_count] = bram_data[31:24]; end
-                        2: begin pixel = bram_data[15:8]; image[pixel_count] = bram_data[31:24]; end
-                        3: begin pixel = bram_data[7:0]; image[pixel_count] = bram_data[31:24]; end
+                        0: begin pixel = bram_data[31:24];  end
+                        1: begin pixel = bram_data[23:16];  end
+                        2: begin pixel = bram_data[15:8];  end
+                        3: begin pixel = bram_data[7:0];  end
                     endcase
                     pixel_valid = 1'b1;                                             // Pixel is valid!!
                     
@@ -214,7 +223,7 @@ module read_module
                         next_pixel_count  = pixel_count + 1;
                     end
                     
-                    if (image_count == (TOT_NUM_IMAGES)) begin                        // All images are done? Go back to idle
+                    if (image_count == (TOT_NUM_IMAGES)) begin                      // All images are done? Go back to idle
                         next_state = idle;                                          
                     end else begin
                         next_state = reading_image;
@@ -222,11 +231,15 @@ module read_module
                 end
                 
                 interruption: begin                                                 // filter needs more time, all values need to stay equal, TEST THIS
-                    pixel = bram_data[31:23];                                       // Read 8 MSB of the BRAM output data
+                    pixel = 0;                                                      // 
                     pixel_valid = 1'b0;                                             // Pixel is not valid!!
                     
                     if (!interrupt) begin                                           // interruption done? Go back to reading
                         next_state = reading_image;
+                        if (index_count == 3) begin                                 // start updating index count and bram_addr to ensure correct order of pixels
+                            next_bram_addr = bram_addr + 4;
+                            next_index_count = index_count;
+                        end
                     end else begin
                         next_state = interruption;
                     end
