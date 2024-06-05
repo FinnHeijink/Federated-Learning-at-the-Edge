@@ -1,7 +1,7 @@
 module write_module    
     #(  parameter DATA_WIDTH = 32,                                                  // The number of bits extracted from the BRAM per clock cycle
         parameter ADDR_WIDTH = 32,                                                  // The size of the BRAM addresses in bits
-        parameter OUTPUT_ADDR = 32'hB002_0000,                                      // The base address of the BRAM for the kernel data
+        parameter OUTPUT_ADDR = 32'hB000_2000,                                      // The base address of the BRAM for the kernel data
         parameter PIXEL_SIZE = 8,                                                   // Number of bits for 1 pixel   
         parameter PIXEL_PER_WORD = 4                                                // Number of pixels written at the same time to the BRAM
     )(     
