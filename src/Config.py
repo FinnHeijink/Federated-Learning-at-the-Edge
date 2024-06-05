@@ -17,7 +17,7 @@ def GetConfig(doPostConfig=True):
         ),
 
         training=dict(
-            epochs=100,
+            epochs=1,
             warmupEpochs=10,
             evaluateEveryNEpochs=1,
             classifierEpochs=1,
