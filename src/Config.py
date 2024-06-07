@@ -24,7 +24,7 @@ def GetConfig(doPostConfig=True):
             finalclassifierEpochs=10,
         ),
         dataset=dict(
-            datasetName="CIFAR10",
+            datasetName="MNIST",
             normalization=None, #autoset
             batchSize=32,
             classificationSplit=0.1,

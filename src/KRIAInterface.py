@@ -23,8 +23,10 @@ class FConv2D_3x3(torch.autograd.Function):
         ctx.save_for_backward(input, weight, bias)
 
         result = QNN.quantize(F.conv2d(QNN.quantize(input), QNN.quantize(weight)))
-        reshapedBias = bias.reshape(1, bias.shape[0], 1, 1).repeat(result.shape[0], 1, result.shape[2], result.shape[3])
-        result += reshapedBias
+
+        if bias is not None:
+            reshapedBias = bias.reshape(1, bias.shape[0], 1, 1).repeat(result.shape[0], 1, result.shape[2], result.shape[3])
+            result += reshapedBias
 
         return result
 
