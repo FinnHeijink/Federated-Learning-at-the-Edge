@@ -177,11 +177,13 @@ class Client:
         try:
             self.run_()
         except KeyboardInterrupt:
-            self.communication.sendMessage("stop")
-            while not self.communication.isDataReady():
-                time.sleep(1)
-            self.communication.receiveMessage()
-            self.communication.close()
+            pass
+
+        self.communication.sendMessage("stop")
+        while not self.communication.isDataReady():
+            time.sleep(1)
+        self.communication.receiveMessage()
+        self.communication.close()
 
     def run_(self):
         shouldStop = False
@@ -229,8 +231,6 @@ class Client:
                 print("Sending model to server")
                 self.communication.sendMessage("update")
                 self.communication.sendModel(self.model)
-
-        self.communication.close()
 
 def main():
     config = Config.GetConfig()

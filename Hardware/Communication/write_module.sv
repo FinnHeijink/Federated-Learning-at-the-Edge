@@ -78,7 +78,7 @@ module write_module
                         next_bram_data[index] = pixel;
                     end
                     //write_enable = 4'b1111;
-                    if (index == 0) begin                                               // If word is complete go to writing
+                    if (pixel_valid == 1 & index == 0) begin                                               // If word is complete go to writing
                         next_state = writing;
                     end 
                 end
