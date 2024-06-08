@@ -30,7 +30,7 @@ def GetConfig(doPostConfig=True):
             classificationSplit=0.1,
         ),
         EMA=dict(
-            initialTau=0.0,
+            initialTau=0.99,
             epochCount=None, #autoset
             enableSchedule=True
         ),
@@ -39,7 +39,7 @@ def GetConfig(doPostConfig=True):
             batchNorm=None #autoset
         ),
         BYOL=dict(
-            encoderName="EncoderType4",
+            encoderName="EncoderType1",
             projector=dict(
                 hiddenSize=128,
                 outputSize=32,
@@ -123,7 +123,7 @@ def DoPostConfig(config):
     config["optimizer"]["settings"]["lr"] = config["optimizer"]["settings"]["lr"] * config["dataset"]["batchSize"] / 64
 
     if config["EMA"]["initialTau"] > 0.01:  # Tau=0 means EMA disabled, so don't scale it. Otherwise, do scale.
-        config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (config["dataset"]["batchSize"] / 128)
+        config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (config["dataset"]["batchSize"] / 64)
 
     if config["dataset"]["datasetName"] == "MNIST":
         config["augmenter"]["imageDims"] = (28, 28)
