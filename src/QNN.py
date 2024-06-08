@@ -18,23 +18,23 @@ def quant_one(W, nb):
     if nb == 1:
         return (W >= 0).float() * 2 - 1
     elif nb == 2:
-        return torch.clamp(torch.round(W), -1, 1)
+        return torch.clamp(torch.floor(W), -1, 1)
     non_sign_bits = nb - 1
     m = pow(2, non_sign_bits)
-    return torch.clamp(torch.round(W * m), -m, m - 1) / m
+    return torch.clamp(torch.floor(W * m), -m, m - 1) / m
 
 def quant_fraction(W, nb, nfract):
     if nb == 1:
         return (W >= 0).float() * 2 - 1
     elif nb == 2:
-        return torch.clamp(torch.round(W), -1, 1)
+        return torch.clamp(torch.floor(W), -1, 1)
 
     non_sign_bits = nb - 1
 
     f = pow(2, nfract)
     m = pow(2, non_sign_bits)
 
-    return torch.clamp(torch.round(W * f), -m, m - 1) / f
+    return torch.clamp(torch.floor(W * f), -m, m - 1) / f
 
 class SurrGradSpike(torch.autograd.Function):
     """

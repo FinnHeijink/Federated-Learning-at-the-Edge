@@ -1,6 +1,5 @@
 import torch
 import torch.optim as optim
-from torchsummary import summary
 
 import argparse
 
@@ -174,7 +173,6 @@ def main():
 
         for i in range(config["training"]["finalclassifierEpochs"]):
             TrainClassifierEpoch(classifier, device, dataset, classifierOptimizer, classifierCheckpointer, config["training"]["epochs"], config["training"]["epochs"], config["useHalfPrecision"])
-        
         testResults = TestEpoch(classifier, device, dataset, config["useHalfPrecision"])
         statistics.append((*testResults, config["training"]["epochs"]))
 
