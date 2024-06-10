@@ -7,7 +7,7 @@ module read_module
         parameter KERNEL_SIZE = 9,                                                  // Size of the kernel in terms of 32 bits!
         parameter KERNEL_WIDTH = 12,
         parameter IMAGE_SIZE = 784,  //196                                           // Size of the image in terms of 8 bits!
-        parameter TOT_NUM_IMAGES = 4                                                // Number of images read in a batch
+        parameter TOT_NUM_IMAGES = 2                                                // Number of images read in a batch
         //parameter SER_NUM_IMAGES                                                  // Number of images before the address has to be reset
     )(
         // System signals
@@ -32,7 +32,7 @@ module read_module
         
         // Internal signals
         logic [ADDR_WIDTH-1:0] next_bram_addr;                                      
-        logic [KERNEL_SIZE-1:0][DATA_WIDTH-1:0] next_kernel;
+        logic [KERNEL_SIZE-1:0][KERNEL_WIDTH-1:0] next_kernel;
         logic prev_read_kernel, prev_read_image;                     
         logic [7:0]  kernel_count, next_kernel_count;
         logic [7:0]  image_count, next_image_count;
@@ -127,7 +127,7 @@ module read_module
                     end
                 end
                 
-                start_reading_kernel1: begin                                         // Make preparations to start reading the kernel, 2 cycles delay due to latency of BRAM
+                start_reading_kernel1: begin                                        // Make preparations to start reading the kernel, 2 cycles delay due to latency of BRAM
                     pixel = 1'b0;                                                   // No pixel is being read, pixel is not valid
                     pixel_valid = 1'b0;
                     
@@ -141,11 +141,11 @@ module read_module
                     next_state = start_reading_kernel2;
                 end
                 
-                start_reading_kernel2: begin                                         // Make preparations to start reading the kernel, 2 cycles delay due to latency of BRAM
+                start_reading_kernel2: begin                                        // Make preparations to start reading the kernel, 2 cycles delay due to latency of BRAM
                     pixel = 1'b0;                                                   // No pixel is being read, pixel is not valid
                     pixel_valid = 1'b0;
                     
-                    next_bram_addr = KERNEL_ADDR + 4;                                   // Already start adding to base address due to additional latency at BRAM side
+                    next_bram_addr = KERNEL_ADDR + 4;                               // Already start adding to base address due to additional latency at BRAM side
                     
                     next_kernel_count = 0;                                          // Nothing has happened yet, so counters still zero
                     next_pixel_count  = 0;

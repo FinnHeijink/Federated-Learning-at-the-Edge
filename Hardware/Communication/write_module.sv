@@ -1,7 +1,7 @@
 module write_module    
     #(  parameter DATA_WIDTH = 32,                                                  // The number of bits extracted from the BRAM per clock cycle
         parameter ADDR_WIDTH = 32,                                                  // The size of the BRAM addresses in bits
-        parameter OUTPUT_ADDR = 32'hB000_2000,                                      // The base address of the BRAM for the kernel data
+        parameter OUTPUT_ADDR = 32'h0000_0000,                                      // The base address of the BRAM for the kernel data
         parameter PIXEL_SIZE = 8,                                                   // Number of bits for 1 pixel   
         parameter PIXEL_PER_WORD = 4                                                // Number of pixels written at the same time to the BRAM
     )(     
@@ -16,8 +16,8 @@ module write_module
         
         // Hardware Output
         input logic [PIXEL_SIZE-1:0] pixel,                                         // Output filter which has to be written in BRAM
-        input logic pixel_valid,                                                    // Indication that the pixel signal is a valid output pixe
-        input logic conv_done);                                                     // Convolution is done
+        input logic pixel_valid);                                                    // Indication that the pixel signal is a valid output pixe
+        //input logic conv_done);                                                     // Convolution is done
         
         // Internal signals
         logic [ADDR_WIDTH-1:0] next_bram_addr;   
@@ -91,12 +91,13 @@ module write_module
                     
                     next_bram_addr = bram_addr + 4; 
                     write_enable = 4'b1111;                                             // Enable writing to the BRAM
+                    next_state = collecting;
                     
-                    if (conv_done) begin                                                // Return to idle state when the convolution is done to reset values
-                        next_state = idle;
-                    end else begin
-                        next_state = collecting;
-                    end
+//                    if (conv_done) begin                                                // Return to idle state when the convolution is done to reset values
+//                        next_state = idle;
+//                    end else begin
+//                        next_state = collecting;
+//                    end
                 end
             endcase
         end                    

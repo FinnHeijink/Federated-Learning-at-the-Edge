@@ -17,15 +17,15 @@ module bram_sim(
     always_comb begin
         if (enable) begin
             unique case (address) 
-                32'hB000_0000: next_data_out = 1;
-                32'hB000_0004: next_data_out = 32'h2;
-                32'hB000_0008: next_data_out = 32'h3;
-                32'hB000_000C: next_data_out = 32'h4;
-                32'hB000_0010: next_data_out = 32'h5;
-                32'hB000_0014: next_data_out = 32'h6;
-                32'hB000_0018: next_data_out = 32'h7;
-                32'hB000_001C: next_data_out = 32'h8;
-                32'hB000_0020: next_data_out = 32'h9;
+                32'hB000_0000: next_data_out = 32'h11102220;
+                32'hB000_0004: next_data_out = 32'h33304440;
+                32'hB000_0008: next_data_out = 32'h55506660;
+                32'hB000_000C: next_data_out = 32'h77708880;
+                32'hB000_0010: next_data_out = 32'h9990AAA0;
+                32'hB000_0014: next_data_out = 32'hBBB0CCC0;
+                32'hB000_0018: next_data_out = 32'hBBB0CCC0;
+                32'hB000_001C: next_data_out = 32'hDDD0EEE0;
+                32'hB000_0020: next_data_out = 32'hFFF00000;
                 32'hB000_0024: next_data_out = 32'h11223344;
                 32'hB000_0028: next_data_out = 32'h55667788;
                 32'hB000_002C: next_data_out = 32'h99AABBCC;

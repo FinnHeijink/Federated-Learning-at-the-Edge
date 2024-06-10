@@ -7,7 +7,7 @@ module top_KRIA_CLA_Communication();
     logic [31:0] addr_in, data_in, addr_out, data_out, not_used, result_k, result_i, selecter;
     logic [17:0][7:0] image;
 
-    KRIA_CLA_Communication_wrapper
+    KRIA_CLA_Communication_wrapper L1
        (.BRAM_inputs_addr(addr_in),
         .BRAM_inputs_clk(clock),
         .BRAM_inputs_din(32'b0),
@@ -30,7 +30,7 @@ module top_KRIA_CLA_Communication();
         .result_k_tri_i(result_k),
         .selecter_tri_o(selecter));
         
-    read_module
+    read_module L2
        (.clk(clock),
         .reset(reset),
         .bram_addr(addr_in),                            
@@ -40,33 +40,23 @@ module top_KRIA_CLA_Communication();
         .read_image(read_image),                                                     
         .pixel(pixel),                                  
         .pixel_valid(pixel_valid),
-        .image(image),                                                   
         .interrupt(1'b0));
     
-    write_module
+    write_module 
+       #(.OUTPUT_ADDR(32'h00000000)) L3
        (.clk(clock),
         .reset(reset),
         .bram_addr(addr_out),                                    
         .bram_data(data_out),                                   
         .write_enable(write_enable),
         .pixel(pixel),                                         
-        .pixel_valid(pixel_valid),                                                    
-        .conv_done(1'b0));
+        .pixel_valid(pixel_valid));
     
-    check_kernel
+    check_kernel L4
        (.in(kernel),
         .selecter(selecter),
         .result(result_k));
-        
-    top_conv (
-    .clk_i(clk),
-    .rst_ni(!reset),
-    .k_val(kernel),
-    pixel_i(pixel_in),
-    pix_data_valid(pixel_valid),
-    pixel_o,
-    conv_finished
-);
+
     
     //check_output
     //(.clk(clock), .reset(reset), .pixel(pixel), .pixel_valid(pixel_valid));
