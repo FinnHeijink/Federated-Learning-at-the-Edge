@@ -1,5 +1,5 @@
 module grayscale_conv #(
-  parameter width = 16,
+  parameter width = 12,
   parameter input_width = 8  
   )(
   input logic                  clk_i,
@@ -22,7 +22,7 @@ module grayscale_conv #(
   localparam PIXEL_WIDTH = 8;
   localparam MULTIPLICATION_WIDTH = 20;
   localparam ACCUMULATOR_WIDTH = 24;
-  localparam DECIMAL_WIDTH = 4;
+  localparam DECIMAL_WIDTH = 8;
 
   // -----------------------
   // Multiplier
@@ -33,22 +33,12 @@ module grayscale_conv #(
   const logic [MULTIPLICATION_WIDTH-PIXEL_WIDTH-1:0] MUL_PREFIX = '0; // Prepend signed representation of pixel with sufficient 0s
 
   always_comb begin
-	mul_d[0][0] = $signed(k_i[0][0]) * $signed(pixel_i[0][0]);
-	mul_d[0][2] = $signed(k_i[0][2]) * $signed(pixel_i[0][2]);
-	mul_d[1][0] = $signed(k_i[1][0]) * $signed(pixel_i[1][0]);
-	mul_d[0][1] = $signed(k_i[0][1]) * $signed(pixel_i[0][1]);
-	mul_d[1][1] = $signed(k_i[1][1]) * $signed(pixel_i[2][0]);
-	mul_d[1][2] = $signed(k_i[1][2]) * $signed(pixel_i[1][2]);
-	mul_d[2][0] = $signed(k_i[2][0]) * $signed(pixel_i[2][0]);
-	mul_d[2][0] = $signed(k_i[2][2]) * $signed(pixel_i[2][0]);
-	mul_d[2][2] = $signed(k_i[2][2]) * $signed(pixel_i[2][2]);
-	/*
     for (int x = 0; x < 3; x++) begin
       for (int y = 0; y < 3; y++) begin
-        mul_d[x][y] = $signed(k_i[x][y]) * $signed(pixel_i[x][y]);
+        mul_d[x][y] = $signed(k_i[x][y]) * $signed({MUL_PREFIX, pixel_i[x][y]});
       end
     end
-	*/
+
   end
 
   logic mul_data_valid;

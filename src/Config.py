@@ -18,19 +18,19 @@ def GetConfig(doPostConfig=True):
 
         training=dict(
             epochs=50,
-            warmupEpochs=10,
+            warmupEpochs=1,
             evaluateEveryNEpochs=1,
             classifierEpochs=1,
-            finalclassifierEpochs=10,
+            finalclassifierEpochs=20,
         ),
         dataset=dict(
-            datasetName="MNIST",
+            datasetName="KMNIST",
             normalization=None, #autoset
-            batchSize=32,
+            batchSize=64,
             classificationSplit=0.1,
         ),
         EMA=dict(
-            initialTau=0.9,
+            initialTau=0.99,
             epochCount=None, #autoset
             enableSchedule=True
         ),
@@ -39,7 +39,7 @@ def GetConfig(doPostConfig=True):
             batchNorm=None #autoset
         ),
         BYOL=dict(
-            encoderName="Encoder",
+            encoderName="EncoderType1",
             projector=dict(
                 hiddenSize=128,
                 outputSize=32,
@@ -63,8 +63,8 @@ def GetConfig(doPostConfig=True):
         optimizer=dict(
             name="SGD",
             settings=dict(
-                lr=0.01,
-                weight_decay=4e-5,
+                lr=0.05,
+                weight_decay=0.0001,
                 momentum=0.9
             )
         ),
@@ -73,9 +73,9 @@ def GetConfig(doPostConfig=True):
             momentum=0.1
         ),
         quantization = dict(
-            enabled=False,
-            nb=24,
-            nf=12,
+            enabled=True,
+            nb=12,
+            nf=7,
             quantizeWeights=False,
             useCustomConv=True
         ),
@@ -120,10 +120,10 @@ def DoPostConfig(config):
     config["EMA"]["epochCount"] = config["training"]["epochs"]
     config["augmenter"]["useHalfPrecision"] = config["useHalfPrecision"]
 
-    config["optimizer"]["settings"]["lr"] = config["optimizer"]["settings"]["lr"] * config["dataset"]["batchSize"] / 32
+    config["optimizer"]["settings"]["lr"] = config["optimizer"]["settings"]["lr"] * config["dataset"]["batchSize"] / 64
 
     if config["EMA"]["initialTau"] > 0.01:  # Tau=0 means EMA disabled, so don't scale it. Otherwise, do scale.
-        config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (config["dataset"]["batchSize"] / 128)
+        config["EMA"]["initialTau"] = 1 - (1 - config["EMA"]["initialTau"]) * (config["dataset"]["batchSize"] / 64)
 
     if config["dataset"]["datasetName"] == "MNIST":
         config["augmenter"]["imageDims"] = (28, 28)
@@ -142,6 +142,12 @@ def DoPostConfig(config):
     elif config["dataset"]["datasetName"] == "FashionMNIST":
         config["augmenter"]["imageDims"] = (28, 28)
         config["dataset"]["normalization"] = ((0.1307,), (0.3081,))
+        config["BYOL"]["encoder"]["imageDims"] = (28, 28)
+        config["BYOL"]["encoder"]["imageChannels"] = 1
+        config["classifier"]["classCount"] = 10
+    elif config["dataset"]["datasetName"] == "KMNIST":
+        config["augmenter"]["imageDims"] = (28, 28)
+        config["dataset"]["normalization"] = ((0.1917,), (0.3483,))
         config["BYOL"]["encoder"]["imageDims"] = (28, 28)
         config["BYOL"]["encoder"]["imageChannels"] = 1
         config["classifier"]["classCount"] = 10
