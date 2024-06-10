@@ -5,13 +5,13 @@ module RotationKRIA
     // connection signals
     
     logic clk, reset;                                   // system signals
-    logic rotate_start, interrupt, rotate_done;             // control signals crop module
+    logic crop_start, crop_done;             // control signals crop module
+    //logic interrupt
     logic [7:0] pixel;                                  // pixel of cropped image to be written into memory
     logic pixel_valid;                                  // this pixel is valid
     logic [31:0] bram_address_in, bram_address_out;     // the addresses to access the input and output bram memory
     logic [31:0] bram_data_in, bram_data_out, not_used; // the data read from/written in the brams
     logic [3:0] w_enable;                               // enable writing option output bram
-    logic conv_done;                                    // not used yet, controlsignal of write module to restart or something
     
     
     // port maps
@@ -33,16 +33,16 @@ module RotationKRIA
         .bram_output_we(w_enable),
         .clock(clk),
         .restart_tri_o(reset),
-        .start_tri_o(rotate_start));
+        .start_tri_o(crop_start));
         
 
     
     Rotation
    (.clk(clk),
     .reset(reset),
-    .start(rotate_start),                             
-    .interrupt(1'b0),                          
-    .image_done(rotate_done),                      
+    .start(crop_start),                             
+    //.interrupt(1'b0),                          
+    .image_done(crop_done),                      
     .pixel_o(pixel),                   
     .pixel_valid(pixel_valid),                    
     .bram_address(bram_address_in),               
@@ -55,8 +55,7 @@ module RotationKRIA
     .bram_data(bram_data_out),                                    
     .write_enable(w_enable),
     .pixel(pixel),                                         
-    .pixel_valid(pixel_valid),                                             
-    .conv_done(rotate_done));
+    .pixel_valid(pixel_valid));                                             
     
 endmodule
 
