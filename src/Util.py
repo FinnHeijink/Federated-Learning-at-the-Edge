@@ -54,7 +54,7 @@ class WarmupCosineScheduler(torch.optim.lr_scheduler.LRScheduler):
         elif self._step_count < self.epochCount:
             return [self.baseLearningRate * 0.5 * (1 + math.cos(math.pi * afterWarmupEpoch / nonWarmupEpochCount))]
         else:
-            return [self.baseLearningRate]
+            return [0]
 
 class EMAScheduler:
     def __init__(self, initialTau, epochCount, enableSchedule):

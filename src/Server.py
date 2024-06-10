@@ -116,8 +116,8 @@ class Server:
 
             self.classifier.copyEncoderFromBYOL(self.currentModel)
             for i in range(self.config["server"]["classifierTrainEpochs"]):
-                mainModule.TrainClassifierEpoch(self.classifier, self.device, self.dataset, self.classifierOptimizer, self.checkpointer, -1, -1)
-            mainModule.TestEpoch(self.classifier, self.device, self.dataset)
+                mainModule.TrainClassifierEpoch(self.classifier, self.device, self.dataset, self.classifierOptimizer, self.checkpointer, -1, -1, self.config["useHalfPrecision"])
+            mainModule.TestEpoch(self.classifier, self.device, self.dataset, self.config["useHalfPrecision"])
 
 def main():
     config = Config.GetConfig()
